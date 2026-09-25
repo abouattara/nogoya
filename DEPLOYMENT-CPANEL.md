@@ -8,21 +8,28 @@ est différente (Docker, Redis managé, stockage objet).
 
 ---
 
-## Avant de commencer : trois choses à vérifier dans cPanel
+## 0. La vérification qui décide de tout : la version de MariaDB
 
-Le reste de la procédure en dépend.
+Votre hébergement fournit **Setup Python App**, **Setup Node.js App** et
+**phpMyAdmin** — donc MySQL/MariaDB, pas PostgreSQL. Le portage est possible
+(rien dans le code n'est propre à PostgreSQL), à une condition :
 
-| À chercher dans cPanel | Ce que ça détermine |
+> **Django 6 exige MariaDB ≥ 10.6 ou MySQL ≥ 8.0.11.**
+> En dessous, il refuse de démarrer — ce n'est pas contournable
+> proprement.
+
+Ouvrez phpMyAdmin : la version du serveur s'affiche sur la page d'accueil,
+encadré « Serveur de base de données ». Beaucoup d'hébergements mutualisés
+tournent encore en 10.3 ou 10.4.
+
+| Version constatée | Marche à suivre |
 |---|---|
-| **Setup Python App** (section Software) | Sans lui, l'API ne peut pas tourner ici. C'est rédhibitoire. |
-| **Setup Node.js App** | Détermine si le frontend va sur cPanel ou ailleurs (voir § Frontend). |
-| **PostgreSQL Databases** ou seulement **MySQL Databases** | Le paquet Python à installer et l'URL de connexion. |
+| MariaDB ≥ 10.6 / MySQL ≥ 8.0.11 | Continuer avec ce document. |
+| Plus ancienne | Demander la mise à niveau au support AshuraHosting — c'est courant et souvent immédiat. À défaut, rétrograder le projet en Django 5.2 LTS (MariaDB ≥ 10.5) : un changement réel, à tester. |
 
 Notez aussi la **version de Python** proposée (3.10 minimum ; 3.12 ou 3.13
 de préférence) et si vous avez un accès **Terminal** ou **SSH** — sinon les
-commandes se lancent depuis le bouton « Run » de l'interface Python App.
-
----
+commandes se lancent depuis les boutons de l'interface Python App.
 
 ## Ce qui change par rapport à l'architecture de référence
 
@@ -35,6 +42,7 @@ Un mutualisé ne fournit ni Redis, ni Docker, ni processus long. Le profil
 | Cache | Redis | Table en base (`createcachetable`) |
 | Tâches | Worker Celery | Exécutées dans la requête (~1 s pour une photo) |
 | Médias | S3 / Cloudflare R2 | Disque du compte (persistant ici) |
+| Base | PostgreSQL | MySQL / MariaDB |
 | WebSockets | — | — (le chat fonctionne déjà par polling) |
 
 **Le cache en base n'est pas un détail de confort.** La déduplication des
@@ -42,28 +50,53 @@ vues et les quotas de débit s'appuient dessus. Avec un cache en mémoire,
 chaque worker Passenger aurait le sien et un quota de 20 connexions/minute
 deviendrait 20 × le nombre de workers.
 
+**Le fuseau horaire passe en UTC sur MySQL, et ce n'est pas arbitraire.**
+Les graphiques du tableau de bord regroupent par jour (`TruncDate`). Dès que
+le fuseau de Django diffère de celui de la connexion, Django écrit
+`CONVERT_TZ(col, 'UTC', 'Africa/Ouagadougou')` — qui renvoie **NULL** tant
+que les tables de fuseaux ne sont pas chargées dans MySQL
+(`mysql_tzinfo_to_sql`), ce qu'un mutualisé ne permet jamais. Les statistiques
+seraient vides, sans la moindre erreur dans les journaux. Le Burkina Faso
+étant à UTC+0 toute l'année, sans heure d'été, basculer en UTC ne décale
+aucune heure affichée et supprime l'appel. C'est automatique dès que l'URL
+de base commence par `mysql://`.
+
 ---
 
 ## 1. Base de données
 
-Dans cPanel → *PostgreSQL Databases* (ou *MySQL Databases*) :
+cPanel → *MySQL Databases* :
 
 1. créer une base, par exemple `moncompte_nogoya` ;
 2. créer un utilisateur avec un mot de passe long et généré ;
 3. lui donner **tous les privilèges** sur cette base.
 
 cPanel préfixe les noms par votre identifiant de compte : notez les noms
-exacts affichés, ce sont eux qu'il faut mettre dans l'URL.
+exacts affichés, ce sont eux qui vont dans l'URL.
 
 ```
-PostgreSQL : postgres://UTILISATEUR:MOTDEPASSE@127.0.0.1:5432/BASE
-MySQL      : mysql://UTILISATEUR:MOTDEPASSE@127.0.0.1:3306/BASE
+DATABASE_URL=mysql://UTILISATEUR:MOTDEPASSE@127.0.0.1:3306/BASE
 ```
 
-En MySQL, décommentez `mysqlclient` dans `requirements/cpanel.txt` et
-commentez `psycopg`.
+Si le mot de passe contient `@`, `:`, `/` ou `#`, encodez-le
+(`monmotdepasse@1` → `monmotdepasse%401`), sinon l'URL est mal découpée.
 
----
+Le profil `cpanel.py` détecte `mysql://` et applique automatiquement :
+`utf8mb4`, le mode SQL strict (sans lui, MySQL tronque silencieusement une
+valeur trop longue au lieu de refuser l'écriture) et le passage en UTC
+expliqué plus haut.
+
+### Pilote
+
+`mysqlclient` est le pilote recommandé, mais il se compile. Si
+`pip install` échoue faute d'en-têtes de développement :
+
+```bash
+pip install PyMySQL
+```
+
+Le projet bascule tout seul (`config/__init__.py` installe PyMySQL sous le
+nom attendu par Django). Rien d'autre à changer.
 
 ## 2. Récupérer le code
 
@@ -100,7 +133,7 @@ DJANGO_ALLOWED_HOSTS=api.mondomaine.com
 DJANGO_CSRF_TRUSTED_ORIGINS=https://api.mondomaine.com,https://mondomaine.com
 CORS_ALLOWED_ORIGINS=https://mondomaine.com
 FRONTEND_URL=https://mondomaine.com
-DATABASE_URL=postgres://UTILISATEUR:MOTDEPASSE@127.0.0.1:5432/BASE
+DATABASE_URL=mysql://UTILISATEUR:MOTDEPASSE@127.0.0.1:3306/BASE
 CELERY_TASK_ALWAYS_EAGER=True
 ```
 
@@ -131,6 +164,8 @@ Puis :
 
 ```bash
 pip install -r requirements/cpanel.txt
+# Si mysqlclient échoue à se compiler :
+#   pip install PyMySQL
 python manage.py migrate
 python manage.py createcachetable          # la table de cache, indispensable
 python manage.py collectstatic --noinput
@@ -275,3 +310,28 @@ Si `/readyz/` renvoie `cache: error`, c'est que `createcachetable` n'a pas
   changement de code.
 - **Quota disque.** Les médias grossissent en continu ; la tâche du § 8 les
   contient, elle ne les remplace pas.
+
+## Ce qui a été vérifié, et ce qui ne l'a pas été
+
+Pour que vous sachiez où porter votre attention au premier déploiement.
+
+**Vérifié sur cette machine :**
+
+- le profil `cpanel.py` se charge et produit la bonne configuration
+  (cache en base, Celery synchrone, UTC sur MySQL, `utf8mb4`, mode strict) ;
+- le repli automatique vers PyMySQL fonctionne quand `mysqlclient` manque ;
+- aucune dépendance à PostgreSQL dans le code (ni `django.contrib.postgres`,
+  ni type propriétaire) ;
+- le DDL généré pour MySQL est correct : colonnes `json` natives, contraintes
+  uniques et index bien en dessous de la limite de 3072 octets d'InnoDB ;
+- le lookup JSON `contains` utilisé par les filtres par caractéristique est
+  supporté par MariaDB avec Django 6.
+
+**Non vérifié, faute de serveur adéquat ici :** l'exécution réelle des
+migrations et de la suite de tests sur MariaDB ≥ 10.6. La seule instance
+disponible localement était une MariaDB 10.4, sous le minimum de Django 6 —
+elle a d'ailleurs échoué exactement là où ce minimum existe pour l'éviter
+(`INSERT … RETURNING`, apparu en 10.5).
+
+Concrètement : lancez `python manage.py migrate` en premier et lisez sa
+sortie avant toute autre chose. C'est là que se manifesterait une surprise.

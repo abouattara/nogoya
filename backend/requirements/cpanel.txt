@@ -8,9 +8,19 @@
 Django>=5.1,<6.1
 django-environ>=0.11
 
-# Base de données : décommenter celui que propose l'hébergeur.
-psycopg[binary]>=3.2      # PostgreSQL
-# mysqlclient>=2.2        # MySQL / MariaDB
+# --- Base de données -------------------------------------------------------
+# AshuraHosting fournit MySQL/MariaDB (phpMyAdmin), pas PostgreSQL.
+#
+# ATTENTION : Django 6 exige MariaDB >= 10.6 ou MySQL >= 8.0.11. En dessous,
+# il refuse de démarrer. Vérifier la version dans phpMyAdmin *avant* de
+# déployer — voir DEPLOYMENT-CPANEL.md § 0.
+#
+# mysqlclient est le pilote recommandé, mais il se compile : si le
+# `pip install` échoue faute d'en-têtes de développement, installer PyMySQL
+# à la place. Le projet bascule automatiquement (config/__init__.py).
+mysqlclient>=2.2.1
+# PyMySQL>=1.1              # repli sans compilation
+# psycopg[binary]>=3.2      # si un jour PostgreSQL est disponible
 
 # API
 djangorestframework>=3.15

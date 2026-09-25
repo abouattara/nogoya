@@ -19,12 +19,38 @@ ce qu'un mutualisé ne fournit pas :
 Activation : `DJANGO_SETTINGS_MODULE=config.settings.cpanel`
 """
 from .prod import *  # noqa: F401,F403
-from .prod import INSTALLED_APPS, env
+from .prod import DATABASES, INSTALLED_APPS, env
 
 # Passenger sert l'application en WSGI : le serveur ASGI n'a rien à faire
 # ici, et ses dépendances (twisted, autobahn…) pèsent pour rien sur le
 # quota disque du compte.
 INSTALLED_APPS = [app for app in INSTALLED_APPS if app != "daphne"]
+
+# ---------------------------------------------------------------------------
+# MySQL / MariaDB
+# ---------------------------------------------------------------------------
+if "mysql" in DATABASES["default"]["ENGINE"]:
+    DATABASES["default"].setdefault("OPTIONS", {})
+    DATABASES["default"]["OPTIONS"].update(
+        {
+            "charset": "utf8mb4",
+            # Sans le mode strict, MySQL tronque silencieusement une valeur
+            # trop longue au lieu de refuser l'écriture.
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
+    )
+
+    # Les graphiques du tableau de bord regroupent par jour (`TruncDate`).
+    # Sur MySQL, dès que le fuseau de Django diffère de celui de la
+    # connexion, Django écrit CONVERT_TZ(col, 'UTC', 'Africa/Ouagadougou') —
+    # qui renvoie **NULL** tant que les tables de fuseaux horaires ne sont
+    # pas chargées dans MySQL (`mysql_tzinfo_to_sql`), ce qu'un mutualisé ne
+    # permet jamais. Les statistiques seraient vides sans la moindre erreur.
+    #
+    # Le Burkina Faso est à UTC+0 toute l'année, sans heure d'été : passer
+    # en UTC ne décale donc *aucune* heure affichée, et supprime l'appel à
+    # CONVERT_TZ puisque les deux fuseaux coïncident.
+    TIME_ZONE = "UTC"
 
 # ---------------------------------------------------------------------------
 # Cache : table de base de données plutôt que Redis
