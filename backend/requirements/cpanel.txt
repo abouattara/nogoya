@@ -1,0 +1,30 @@
+# Hébergement mutualisé cPanel : ni serveur ASGI, ni Redis, ni worker.
+#
+# On ne part pas de base.txt parce que la moitié de ce qu'il installe ne
+# sert à rien ici (daphne et twisted, le client redis) et que le quota
+# disque d'un compte mutualisé est limité.
+
+# Core
+Django>=5.1,<6.1
+django-environ>=0.11
+
+# Base de données : décommenter celui que propose l'hébergeur.
+psycopg[binary]>=3.2      # PostgreSQL
+# mysqlclient>=2.2        # MySQL / MariaDB
+
+# API
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.3
+django-cors-headers>=4.4
+django-filter>=24.3
+drf-spectacular>=0.27
+
+# Traitement d'images (exécuté dans la requête, voir settings/cpanel.py)
+celery>=5.4
+Pillow>=10.4
+
+# Fichiers statiques servis par l'application
+whitenoise>=6.7
+
+# Stockage objet — utile seulement si USE_S3=True
+# django-storages[s3]>=1.14

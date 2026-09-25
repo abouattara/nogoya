@@ -48,8 +48,10 @@ if not USE_S3:
     import warnings
 
     warnings.warn(
-        "USE_S3 is disabled: media files will be written to the container's "
-        "local filesystem and lost on redeploy. See STORAGE.md.",
+        "USE_S3 is disabled: media files go to the local filesystem. That is "
+        "fine on a host with a persistent disk (shared hosting, VPS), and "
+        "loses every upload on redeploy anywhere containerised. See "
+        "STORAGE.md.",
         stacklevel=2,
     )
 

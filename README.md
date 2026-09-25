@@ -109,6 +109,7 @@ Détails et prérequis : [TESTING.md](TESTING.md).
 | [SECURITY.md](SECURITY.md) | authentification, permissions, uploads, vie privée |
 | [TESTING.md](TESTING.md) | stratégie de tests |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | environnements, Docker, mise en production |
+| [DEPLOYMENT-CPANEL.md](DEPLOYMENT-CPANEL.md) | mise en ligne sur un hébergement mutualisé cPanel |
 | [LIVE.md](LIVE.md) | modèles live et intégration vidéo future |
 | [TODO.md](TODO.md) | audit d'avancement, ce qui reste |
 

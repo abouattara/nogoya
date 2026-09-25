@@ -3,6 +3,11 @@
 Trois environnements : `development`, `staging`, `production`. Le code est
 identique partout ; seules les variables d'environnement changent.
 
+> **Hébergement mutualisé cPanel ?** Ce document suppose un VPS ou une
+> plateforme conteneurisée (Docker, Redis managé, stockage objet). Pour un
+> mutualisé, la procédure et les compromis sont dans
+> [DEPLOYMENT-CPANEL.md](DEPLOYMENT-CPANEL.md).
+
 ## Architecture cible (faible coût)
 
 ```
