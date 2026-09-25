@@ -1,0 +1,346 @@
+[WebServer] ⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+
+Running 17 tests using 1 worker
+
+  x   1 [desktop] › e2e\supplier.spec.ts:5:7 › Parcours fournisseur › créer une annonce avec attributs dynamiques et image, puis la modifier (19.8s)
+  ok  2 [desktop] › e2e\supplier.spec.ts:56:7 › Parcours fournisseur › retoucher une image déjà publiée (5.4s)
+  x   3 [desktop] › e2e\supplier.spec.ts:77:7 › Parcours fournisseur › le tableau de bord affiche les statistiques et les graphiques (4.5s)
+  -   4 [desktop] › e2e\supplier.spec.ts:100:7 › Parcours fournisseur › publier / dépublier une annonce approuvée
+  x   5 [desktop] › e2e\supplier.spec.ts:116:7 › Parcours live › créer un live, y associer un produit et l'épingler (5.0s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  x   6 [desktop] › e2e\user.spec.ts:5:7 › Parcours utilisateur connecté › favoris : ajouter depuis une annonce, retrouver dans /favoris (4.2s)
+  ok  7 [desktop] › e2e\user.spec.ts:27:7 › Parcours utilisateur connecté › chat : contacter un fournisseur puis envoyer un message (8.0s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  ok  8 [desktop] › e2e\user.spec.ts:47:7 › Parcours utilisateur connecté › le bouton micro est disponible dans une conversation (5.1s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  x   9 [desktop] › e2e\user.spec.ts:57:7 › Parcours utilisateur connecté › notifications : la cloche et la page listent les notifications (3.9s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  x  10 [desktop] › e2e\user.spec.ts:69:7 › Parcours utilisateur connecté › le tableau de bord propose des suggestions (14.6s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  ok 11 [desktop] › e2e\visitor.spec.ts:4:7 › Parcours visiteur › accueil → recherche → filtre → produit → fournisseur (3.1s)
+  ok 12 [desktop] › e2e\visitor.spec.ts:39:7 › Parcours visiteur › les filtres par caractéristique apparaissent pour une catégorie qui en déclare (1.4s)
+  ok 13 [desktop] › e2e\visitor.spec.ts:51:7 › Parcours visiteur › un état vide utile plutôt qu'une page blanche (732ms)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  ok 14 [desktop] › e2e\visitor.spec.ts:58:7 › Parcours visiteur › favoriter demande de se connecter (829ms)
+  x  15 [mobile] › e2e\mobile.spec.ts:6:7 › Mobile › la navigation mobile ouvre le menu et la recherche reste utilisable (45.5s)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  ok 16 [mobile] › e2e\mobile.spec.ts:21:7 › Mobile › la fiche produit reste lisible sans défilement horizontal (912ms)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '1656430620'
+[WebServer] }
+  ok 17 [mobile] › e2e\mobile.spec.ts:31:7 › Mobile › le menu mobile expose favoris et notifications une fois connecté (3.9s)
+
+
+  1) [desktop] › e2e\supplier.spec.ts:5:7 › Parcours fournisseur › créer une annonce avec attributs dynamiques et image, puis la modifier 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('row').filter({ hasText: 'Berline E2E 1790153354680 (modifiée)' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('row').filter({ hasText: 'Berline E2E 1790153354680 (modifiée)' }) with timeout 10000ms
+      - waiting for getByRole('row').filter({ hasText: 'Berline E2E 1790153354680 (modifiée)' })
+
+
+      51 |
+      52 |     await expect(page).toHaveURL(/\/compte\/fournisseur/);
+    > 53 |     await expect(page.getByRole("row").filter({ hasText: updated })).toBeVisible();
+         |                                                                      ^
+      54 |   });
+      55 |
+      56 |   test("retoucher une image déjà publiée", async ({ page }) => {
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\supplier.spec.ts:53:70
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\supplier-Parcours-fourniss-0890c-s-et-image-puis-la-modifier-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\supplier-Parcours-fourniss-0890c-s-et-image-puis-la-modifier-desktop\error-context.md
+
+  2) [desktop] › e2e\supplier.spec.ts:77:7 › Parcours fournisseur › le tableau de bord affiche les statistiques et les graphiques 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 0
+    Received:   0
+
+       95 |     const hasChart = await analytics.getByRole("img", { name: /Vues/ }).count();
+       96 |     const hasEmpty = await analytics.getByText("Pas encore assez de données").count();
+    >  97 |     expect(hasChart + hasEmpty).toBeGreaterThan(0);
+          |                                 ^
+       98 |   });
+       99 |
+      100 |   test("publier / dépublier une annonce approuvée", async ({ page }) => {
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\supplier.spec.ts:97:33
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\supplier-Parcours-fourniss-be41f-tistiques-et-les-graphiques-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\supplier-Parcours-fourniss-be41f-tistiques-et-les-graphiques-desktop\error-context.md
+
+  3) [desktop] › e2e\supplier.spec.ts:116:7 › Parcours live › créer un live, y associer un produit et l'épingler 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "draft"
+    Received: undefined
+
+      155 |     });
+      156 |
+    > 157 |     expect(created.liveStatus).toBe("draft");
+          |                                ^
+      158 |     expect(created.attachOk).toBe(true);
+      159 |     expect(created.featured).toBe(true);
+      160 |   });
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\supplier.spec.ts:157:32
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\supplier-Parcours-live-cré-cd31b-er-un-produit-et-l-épingler-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\supplier-Parcours-live-cré-cd31b-er-un-produit-et-l-épingler-desktop\error-context.md
+
+  4) [desktop] › e2e\user.spec.ts:5:7 › Parcours utilisateur connecté › favoris : ajouter depuis une annonce, retrouver dans /favoris 
+
+    Error: locator.getAttribute: Error: strict mode violation: getByRole('button', { name: /favoris/ }) resolved to 11 elements:
+        1) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Vélo électrique modifié par' }).getByLabel('Ajouter aux favoris')
+        2) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Motoculteur diesel Location' }).getByLabel('Ajouter aux favoris')
+        3) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Salon 3+2+1 places Vente' }).getByLabel('Ajouter aux favoris')
+        4) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Ordinateur portable i5 8Go' }).getByLabel('Ajouter aux favoris')
+        5) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Lot de 100 chaises pliantes' }).getByLabel('Ajouter aux favoris')
+        6) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka getByRole('link', { name: 'Sono complète 2000W Location' }).getByLabel('Ajouter aux favoris')
+        7) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka locator('a:nth-child(7) > .relative > .absolute.right-2 > .flex')
+        8) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka locator('a:nth-child(8) > .relative > .absolute.right-2 > .flex')
+        9) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka locator('a:nth-child(9) > .relative > .absolute.right-2 > .flex')
+        10) <button aria-pressed="false" title="Ajouter aux favoris" aria-label="Ajouter aux favoris" class="flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-brand-700 shadow-sm backdrop-blur transition-colors hover:bg-surface">…</button> aka locator('a:nth-child(10) > .relative > .absolute.right-2 > .flex')
+        ...
+
+    Call log:
+      - waiting for getByRole('button', { name: /favoris/ })
+
+
+      12 |
+      13 |     const favorite = page.getByRole("button", { name: /favoris/ });
+    > 14 |     const wasFavorite = (await favorite.getAttribute("aria-pressed")) === "true";
+         |                                         ^
+      15 |     if (wasFavorite) {
+      16 |       await favorite.click(); // start from a known state
+      17 |       await expect(favorite).toHaveAttribute("aria-pressed", "false");
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\user.spec.ts:14:41
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\user-Parcours-utilisateur--2937d-once-retrouver-dans-favoris-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\user-Parcours-utilisateur--2937d-once-retrouver-dans-favoris-desktop\error-context.md
+
+  5) [desktop] › e2e\user.spec.ts:57:7 › Parcours utilisateur connecté › notifications : la cloche et la page listent les notifications 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('button', { name: 'Non lues' })
+    Expected: visible
+    Error: strict mode violation: getByRole('button', { name: 'Non lues' }) resolved to 2 elements:
+        1) <button aria-haspopup="menu" aria-expanded="false" aria-label="Notifications (1 non lues)" class="relative flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-surface-muted">…</button> aka getByRole('button', { name: 'Notifications (1 non lues)' })
+        2) <button aria-pressed="false" class="rounded-lg border px-3 py-1.5 text-sm transition-colors border-border bg-surface text-foreground hover:bg-surface-muted">Non lues</button> aka getByRole('button', { name: 'Non lues', exact: true })
+
+    Call log:
+      - Expect "toBeVisible" getByRole('button', { name: 'Non lues' }) with timeout 10000ms
+      - waiting for getByRole('button', { name: 'Non lues' })
+
+
+      64 |     await expect(page).toHaveURL(/\/notifications/);
+      65 |     await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
+    > 66 |     await expect(page.getByRole("button", { name: "Non lues" })).toBeVisible();
+         |                                                                  ^
+      67 |   });
+      68 |
+      69 |   test("le tableau de bord propose des suggestions", async ({ page }) => {
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\user.spec.ts:66:66
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\user-Parcours-utilisateur--ee8b0-e-listent-les-notifications-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\user-Parcours-utilisateur--ee8b0-e-listent-les-notifications-desktop\error-context.md
+
+  6) [desktop] › e2e\user.spec.ts:69:7 › Parcours utilisateur connecté › le tableau de bord propose des suggestions 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('heading', { name: 'Vus récemment' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('heading', { name: 'Vus récemment' }) with timeout 10000ms
+      - waiting for getByRole('heading', { name: 'Vus récemment' })
+
+
+      75 |
+      76 |     await page.goto("/compte");
+    > 77 |     await expect(page.getByRole("heading", { name: "Vus récemment" })).toBeVisible();
+         |                                                                        ^
+      78 |     await expect(page.getByRole("heading", { name: "Mes informations" })).toBeVisible();
+      79 |   });
+      80 | });
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\user.spec.ts:77:72
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\user-Parcours-utilisateur--f74f7-ord-propose-des-suggestions-desktop\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\user-Parcours-utilisateur--f74f7-ord-propose-des-suggestions-desktop\error-context.md
+
+  7) [mobile] › e2e\mobile.spec.ts:6:7 › Mobile › la navigation mobile ouvre le menu et la recherche reste utilisable 
+
+    Test timeout of 45000ms exceeded.
+
+    Error: locator.fill: Test timeout of 45000ms exceeded.
+    Call log:
+      - waiting for getByPlaceholder(/Que cherchez-vous/).first()
+        - locator resolved to <input value="" type="search" aria-label="Rechercher un article" placeholder="Que cherchez-vous ? (véhicule, logement, matériel...)" class="w-full rounded-full border border-border bg-surface text-foreground pl-9 pr-4 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 py-1.5"/>
+        - fill("tente")
+      - attempting fill action
+        2 × waiting for element to be visible, enabled and editable
+          - element is not visible
+        - retrying fill action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and editable
+          - element is not visible
+        - retrying fill action
+          - waiting 100ms
+        87 × waiting for element to be visible, enabled and editable
+           - element is not visible
+         - retrying fill action
+           - waiting 500ms
+
+
+      14 |     ).toBeVisible();
+      15 |
+    > 16 |     await page.getByPlaceholder(/Que cherchez-vous/).first().fill("tente");
+         |                                                              ^
+      17 |     await page.getByRole("button", { name: "Rechercher" }).first().click();
+      18 |     await expect(page).toHaveURL(/search=tente/);
+      19 |   });
+        at C:\Users\Administrator\Documents\TRAVAUX\DEVELOPPEMENT\nogoya\frontend\e2e\mobile.spec.ts:16:62
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\mobile-Mobile-la-navigatio-8b9c4--recherche-reste-utilisable-mobile\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\mobile-Mobile-la-navigatio-8b9c4--recherche-reste-utilisable-mobile\error-context.md
+
+  7 failed
+    [desktop] › e2e\supplier.spec.ts:5:7 › Parcours fournisseur › créer une annonce avec attributs dynamiques et image, puis la modifier 
+    [desktop] › e2e\supplier.spec.ts:77:7 › Parcours fournisseur › le tableau de bord affiche les statistiques et les graphiques 
+    [desktop] › e2e\supplier.spec.ts:116:7 › Parcours live › créer un live, y associer un produit et l'épingler 
+    [desktop] › e2e\user.spec.ts:5:7 › Parcours utilisateur connecté › favoris : ajouter depuis une annonce, retrouver dans /favoris 
+    [desktop] › e2e\user.spec.ts:57:7 › Parcours utilisateur connecté › notifications : la cloche et la page listent les notifications 
+    [desktop] › e2e\user.spec.ts:69:7 › Parcours utilisateur connecté › le tableau de bord propose des suggestions 
+    [mobile] › e2e\mobile.spec.ts:6:7 › Mobile › la navigation mobile ouvre le menu et la recherche reste utilisable 
+  1 skipped
+  9 passed (2.6m)

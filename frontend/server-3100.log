@@ -1,0 +1,10 @@
+
+> frontend@0.1.0 start
+> next start --port 3100
+
+▲ Next.js 16.3.5
+- Local:         http://localhost:3100
+- Network:       http://192.168.1.65:3100
+✓ Ready in 250ms
+✓ Running next.config.ts took 69ms
+⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.

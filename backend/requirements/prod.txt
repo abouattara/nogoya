@@ -1,0 +1,4 @@
+-r base.txt
+
+# Static files served by the app container
+whitenoise>=6.7

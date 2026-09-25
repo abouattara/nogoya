@@ -1,0 +1,150 @@
+# Full local stack: `docker compose up --build`
+#
+#   frontend  http://localhost:3000
+#   backend   http://localhost:8000  (admin: /admin/, API: /api/v1/)
+#   MinIO     http://localhost:9001  (console — S3 API on :9000)
+#
+# Redis is included because the project genuinely uses it (view
+# de-duplication cache, Celery broker, Channels layer), not by default.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nogoya}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # 5433 on the host to avoid clashing with a local PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-nogoya}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379" # 6380: leaves a local Redis/Memurai alone
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # S3-compatible object storage for local development. Production swaps
+  # this for Cloudflare R2 / AWS S3 by changing env vars only (STORAGE.md).
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-nogoyaminio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-nogoyaminio123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: creates the bucket and makes it publicly readable so product
+  # images can be served straight from storage/CDN.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-nogoyaminio} ${S3_SECRET_KEY:-nogoyaminio123} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-nogoya-media} &&
+      mc anonymous set download local/${S3_BUCKET:-nogoya-media}/products &&
+      echo 'MinIO bucket ready'
+      "
+
+  backend:
+    build:
+      context: ./backend
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-compose-dev-key-change-me}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nogoya}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_TASK_ALWAYS_EAGER: "True"
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      CSRF_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:8000
+      USE_S3: "True"
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-nogoya-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nogoyaminio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-nogoyaminio123}
+      S3_REGION: us-east-1
+      S3_ADDRESSING_STYLE: path
+      S3_PUBLIC_DOMAIN: ${S3_PUBLIC_DOMAIN:-localhost:9000/nogoya-media}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+
+  celery:
+    build:
+      context: ./backend
+    command: celery -A config worker -l info --pool=solo
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-compose-dev-key-change-me}
+      DJANGO_DEBUG: "False"
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nogoya}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      USE_S3: "True"
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-nogoya-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nogoyaminio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-nogoyaminio123}
+      S3_REGION: us-east-1
+      S3_ADDRESSING_STYLE: path
+    depends_on:
+      backend:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the browser bundle: must be reachable from the host.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    environment:
+      # Server-side (container-to-container) calls use the service name.
+      API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

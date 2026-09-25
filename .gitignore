@@ -1,0 +1,26 @@
+# Secrets — jamais committés. Chaque service a son .env.example documenté.
+.env
+.env.*
+!.env.example
+
+# Outils locaux
+.claude/settings.local.json
+
+# Sorties de tests et de build
+frontend/test-results/
+frontend/playwright-report/
+frontend/.next/
+frontend/node_modules/
+backend/.venv/
+backend/media/
+backend/staticfiles/
+**/__pycache__/
+*.py[cod]
+
+# Système / éditeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
