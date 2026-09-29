@@ -238,27 +238,99 @@ mises à jour se font au `git push`.
 L'API reste sur AshuraHosting. C'est la répartition la plus simple à
 exploiter, et la moins susceptible de casser.
 
-### Option B — Tout sur cPanel
+### Option B — Tout sur cPanel (Setup Node.js App)
 
-Possible si *Setup Node.js App* existe, avec deux réserves : la mémoire
-allouée à un compte mutualisé est souvent juste pour un serveur Next.js, et
-Passenger redémarre le processus après chaque période d'inactivité — la
-première visite est alors lente.
+Disponible sur cet hébergement. Deux réserves : la mémoire d'un compte
+mutualisé est juste pour un serveur Next.js, et Passenger arrête le
+processus après une période d'inactivité — la visite suivante est alors
+lente.
 
-1. *Setup Node.js App* → Application root `nogoya/frontend`, URL
-   `mondomaine.com`, startup file `server.js` ;
-2. mêmes variables d'environnement qu'en option A ;
-3. dans le Terminal, environnement Node activé :
-   ```bash
-   npm ci
-   npm run build
-   cp -r .next/static .next/standalone/.next/
-   cp -r public .next/standalone/ 2>/dev/null || true
-   ```
-   Le projet est configuré en `output: "standalone"` : le build produit
-   `.next/standalone/server.js`, qui est le fichier de démarrage attendu.
+#### Répartition des noms de domaine
 
----
+| Application | Type | Application URL |
+|---|---|---|
+| Frontend Next.js | Node.js App | `binogoya.com` |
+| API Django | Python App | `api.binogoya.com` |
+
+Les deux ne peuvent pas partager un nom d'hôte : c'est la première erreur à
+éviter.
+
+#### Champs de l'écran « Create Application »
+
+| Champ | Valeur |
+|---|---|
+| Application mode | **Production** — et non Development : ce champ pilote `NODE_ENV`, et un build de production doit tourner avec `NODE_ENV=production` |
+| Application root | `nogoya-node` |
+| Application URL | `binogoya.com` |
+| Application startup file | `server.js` |
+
+Variables d'environnement (bouton *ADD VARIABLE*) :
+
+```
+NEXT_PUBLIC_API_URL=https://api.binogoya.com
+API_URL=https://api.binogoya.com
+```
+
+> Ces deux variables sont lues **au moment du build**, pas seulement à
+> l'exécution : elles déterminent l'hôte autorisé pour les images
+> (`next.config.ts`). Un changement impose de reconstruire.
+
+#### Construire et déposer
+
+`next build` consomme beaucoup de mémoire et dépasse souvent ce qu'autorise
+un compte mutualisé. **Construisez sur votre machine**, puis n'envoyez que
+le résultat :
+
+```bash
+# Sur votre machine, dans frontend/
+NEXT_PUBLIC_API_URL=https://api.binogoya.com API_URL=https://api.binogoya.com npm run build
+```
+
+Le build produit `.next/standalone`, qui embarque son propre
+`node_modules` réduit. Assemblez le dossier à envoyer :
+
+```bash
+mkdir -p deploy
+cp -r .next/standalone/* deploy/
+mkdir -p deploy/.next
+cp -r .next/static deploy/.next/static
+cp -r public deploy/ 2>/dev/null || true
+```
+
+Volumes constatés sur ce projet : **28 Mo** pour `standalone`, 1,5 Mo pour
+`static` — contre 504 Mo pour un `node_modules` complet, qu'il est donc
+inutile d'envoyer.
+
+Compressez `deploy/` en `.zip`, déposez-le dans `nogoya-node` via le
+Gestionnaire de fichiers, extrayez-le, puis **Restart** dans *Setup Node.js
+App*.
+
+L'arborescence finale doit être :
+
+```
+nogoya-node/
+├── server.js          ← fichier de démarrage
+├── node_modules/
+├── package.json
+├── .next/
+│   └── static/        ← indispensable, sinon aucun style ne se charge
+└── public/
+```
+
+#### Si vous préférez construire sur le serveur
+
+Possible si l'hébergeur accorde assez de mémoire. Dans le Terminal,
+environnement Node activé (commande affichée dans *Setup Node.js App*) :
+
+```bash
+cd ~/nogoya/frontend
+npm ci
+NEXT_PUBLIC_API_URL=https://api.binogoya.com API_URL=https://api.binogoya.com npm run build
+```
+
+Un arrêt brutal pendant `npm run build` (« Killed », ou aucun message)
+signifie que la limite mémoire a été atteinte : repassez à la construction
+locale.
 
 ## 8. Entretien
 
@@ -325,7 +397,12 @@ Pour que vous sachiez où porter votre attention au premier déploiement.
 - le DDL généré pour MySQL est correct : colonnes `json` natives, contraintes
   uniques et index bien en dessous de la limite de 3072 octets d'InnoDB ;
 - le lookup JSON `contains` utilisé par les filtres par caractéristique est
-  supporté par MariaDB avec Django 6.
+  supporté par MariaDB avec Django 6 ;
+- le build Next produit bien `.next/standalone/server.js`, qui se replace
+  dans son propre dossier au démarrage (`process.chdir`) et écoute sur
+  `PORT` — ce que Passenger fournit ;
+- l'hôte de l'API figure dans les motifs d'images autorisés du build (sans
+  quoi chaque photo d'annonce revenait en 400).
 
 **Non vérifié, faute de serveur adéquat ici :** l'exécution réelle des
 migrations et de la suite de tests sur MariaDB ≥ 10.6. La seule instance
