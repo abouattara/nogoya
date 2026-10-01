@@ -124,6 +124,13 @@ cPanel → **Setup Python App** → *Create Application* :
 | Application startup file | `passenger_wsgi.py` |
 | Application Entry point | `application` |
 
+> ⚠️ **cPanel écrit son propre `passenger_wsgi.py` en créant l'application**,
+> et écrase celui du projet. Son gabarit contient
+> `wsgi = imp.load_source('wsgi', 'passenger_wsgi.py')`, c'est-à-dire un
+> fichier qui se charge lui-même : toutes les URL répondent alors 500, et le
+> terminal montre un `RecursionError`. **Après avoir créé l'application,
+> restaurez le fichier du projet** (voir § 4).
+
 Toujours dans cet écran, ajoutez les **variables d'environnement** :
 
 ```
@@ -161,6 +168,16 @@ source /home/UTILISATEUR/virtualenv/nogoya/backend/3.12/bin/activate && cd /home
 ```
 
 Puis :
+
+D'abord, **restaurez le point d'entrée écrasé par cPanel** :
+
+```bash
+cd ~/nogoya/backend
+head -3 passenger_wsgi.py     # s'il contient imp.load_source, c'est le gabarit
+```
+
+S'il faut le remplacer : `git checkout passenger_wsgi.py`, ou re-déposez le
+fichier depuis le dépôt. Sans ça, l'application boucle sur elle-même.
 
 ```bash
 pip install -r requirements/cpanel.txt

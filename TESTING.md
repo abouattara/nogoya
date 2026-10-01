@@ -136,6 +136,9 @@ n'avait été repéré à la lecture du code :
 | Relecture du code de stockage | la « URL signée » des vocaux ne signait rien (`AWS_QUERYSTRING_AUTH = False`) et le bucket était public en entier : un vocal privé était lisible par toute personne ayant le lien |
 | Relecture du lecteur audio | `<audio src="/api/…">` part sans en-tête `Authorization` : écouter un vocal renvoyait 401 (« Vocal indisponible ») |
 | Vérification dans le navigateur | une fois l'authentification corrigée, l'endpoint répondait **406** : DRF négocie le renderer sur l'en-tête `Accept` avant d'exécuter la vue |
+| Déploiement réel sur cPanel | cPanel écrase `passenger_wsgi.py` par un gabarit qui se charge lui-même : 500 sur toutes les URL, `RecursionError` au terminal |
+| Déploiement réel sur cPanel | `storages` était déclaré sans condition alors que les dépendances cPanel ne l'installent pas — Django refusait de démarrer dès `migrate` |
+| Déploiement réel sur cPanel | les variables de l'interface cPanel n'atteignent pas le terminal : sans `DATABASE_URL`, Django retombait sur PostgreSQL (« No module named 'psycopg' ») |
 | Relecture du code de limitation de débit | le quota `search` était déclaré dans les réglages mais appliqué à aucune vue ; et compté par IP, il aurait été partagé par tout le site, le rendu serveur masquant l'adresse réelle |
 | Vérification manuelle (login) | une erreur JSON brute (« Unexpected end of JSON input ») s'affichait dans le formulaire de connexion quand l'API redémarrait |
 | Relecture du test « publier / dépublier » | il comptait les boutons avant que le tableau (chargé côté client) n'existe : il se mettait donc en *skip* à chaque exécution au lieu de tester quoi que ce soit |
