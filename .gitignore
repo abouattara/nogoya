@@ -9,6 +9,7 @@
 # Sorties de tests et de build
 frontend/deploy/
 nogoya-frontend.zip
+nogoya-frontend.tar.gz
 frontend/test-results/
 frontend/playwright-report/
 frontend/.next/

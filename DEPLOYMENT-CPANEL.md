@@ -321,9 +321,34 @@ npm run deploy:pack
 Le dossier obtenu pèse **29 Mo** (1 523 fichiers), contre 504 Mo pour un
 `node_modules` complet.
 
-Compressez `deploy/` en `.zip`, déposez-le dans `nogoya-node` via le
-Gestionnaire de fichiers, extrayez-le. Puis, dans le Terminal, environnement
+**Empaquetez en `.tar.gz`, jamais en `.zip` depuis Windows :**
+
+```bash
+tar czf ../nogoya-frontend.tar.gz -C deploy .
+```
+
+`Compress-Archive` de PowerShell — et plus généralement le ZIP créé sous
+Windows — n'enregistre pas les permissions Unix. À l'extraction, les
+dossiers naissent en `rw-r--r--`, **sans le bit `x`** : impossible d'y
+entrer, et l'extraction échoue en cascade sur
+
+```
+checkdir error: cannot create node_modules/next/dist/server
+                Permission denied
+```
+
+ce qui fait croire à un problème de quota. `tar` conserve les modes
+(`drwxr-xr-x`) et le problème disparaît.
+
+Déposez l'archive dans `nogoya-node`, puis dans le Terminal, environnement
 Node activé :
+
+```bash
+cd ~/nogoya-node
+tar xzf nogoya-frontend.tar.gz && rm nogoya-frontend.tar.gz
+```
+
+Puis :
 
 ```bash
 cd ~/nogoya-node
