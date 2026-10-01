@@ -29,6 +29,21 @@ INSTALLED_APPS = [app for app in INSTALLED_APPS if app != "daphne"]
 # ---------------------------------------------------------------------------
 # MySQL / MariaDB
 # ---------------------------------------------------------------------------
+if "postgresql" in DATABASES["default"]["ENGINE"]:
+    # base.py retombe sur PostgreSQL quand DATABASE_URL est absent, et l'on
+    # découvre le problème quinze lignes plus loin sous la forme
+    # « No module named 'psycopg' » — qui ne dit rien de la cause réelle.
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DATABASE_URL n'est pas défini : ce profil vise MySQL/MariaDB et la "
+        "configuration est retombée sur PostgreSQL par défaut. "
+        "Créez un fichier .env à côté de manage.py contenant une ligne "
+        "DATABASE_URL=mysql://UTILISATEUR:MOTDEPASSE@127.0.0.1:3306/BASE — "
+        "les variables définies dans l'interface cPanel ne sont pas toujours "
+        "transmises au terminal, le fichier .env vaut pour les deux."
+    )
+
 if "mysql" in DATABASES["default"]["ENGINE"]:
     DATABASES["default"].setdefault("OPTIONS", {})
     DATABASES["default"]["OPTIONS"].update(
