@@ -57,8 +57,11 @@ async function main() {
   let removed = [];
   if (existsSync(imgDir)) {
     for (const entry of await readdir(imgDir)) {
-      // `colour` et les paquets de la plateforme cible restent.
-      const isPlatformPackage = /^sharp(-libvips)?-[a-z0-9]+-[a-z0-9]+$/.test(entry);
+      // Tout ce qui nomme une plateforme : `sharp-win32-x64`,
+      // `sharp-libvips-linux-arm64`, mais aussi `sharp-wasm32` — 8,7 Mo de
+      // repli WebAssembly qui ne sert à rien quand le binaire natif de la
+      // cible est présent. Seul `colour`, commun à toutes, est conservé.
+      const isPlatformPackage = /^sharp(-libvips)?-/.test(entry);
       if (isPlatformPackage && !entry.includes(KEEP_PLATFORM)) {
         await rm(path.join(imgDir, entry), { recursive: true, force: true });
         removed.push(entry);
