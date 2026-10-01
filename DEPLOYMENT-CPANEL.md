@@ -346,18 +346,54 @@ nogoya-node/
 
 #### Si vous préférez construire sur le serveur
 
-Possible si l'hébergeur accorde assez de mémoire. Dans le Terminal,
-environnement Node activé (commande affichée dans *Setup Node.js App*) :
+Possible, à trois conditions.
+
+**1. Activez l'environnement *Node*, pas celui de Python.** Les deux
+coexistent sur le compte et leurs invites se ressemblent. Si le prompt
+affiche `((backend:3.11))`, vous êtes dans l'environnement Python : `node`
+y reste en version système et `next` est introuvable.
+
+```bash
+source ~/nodevenv/nogoya-node/22/bin/activate && cd ~/nogoya-node
+node -v        # doit afficher v22.x — sinon rien de ce qui suit ne marchera
+```
+
+**2. Utilisez `npm install`, surtout pas `npm ci`.** Le `package-lock.json`
+du dépôt est produit sous Windows, et npm n'y inscrit pas certaines
+dépendances que la résolution Linux exige (`@emnapi/runtime`,
+`@emnapi/core`, tirées des variantes wasm de `sharp` et de Tailwind).
+`npm ci` échoue alors sur :
+
+```
+npm error `npm ci` can only install packages when your package.json and
+npm error package-lock.json are in sync.
+npm error Missing: @emnapi/runtime@1.11.3 from lock file
+```
+
+Ce n'est pas réparable depuis Windows : npm refuse d'ajouter ces entrées,
+même avec `--os=linux --cpu=x64`. `npm install` résout l'arbre à neuf et
+fonctionne.
+
+**3. Surveillez la mémoire et les inodes.** `npm install` dépose 504 Mo et
+26 578 fichiers — les mutualisés limitent souvent le *nombre* de fichiers
+autant que l'espace.
 
 ```bash
 cd ~/nogoya/frontend
-npm ci
+npm install
 NEXT_PUBLIC_API_URL=https://api.binogoya.com API_URL=https://api.binogoya.com npm run build
+npm run deploy:pack
+cp -r deploy/. ~/nogoya-node/
+rm -rf ~/nogoya/frontend/node_modules   # libère les inodes
 ```
 
-Un arrêt brutal pendant `npm run build` (« Killed », ou aucun message)
-signifie que la limite mémoire a été atteinte : repassez à la construction
+Un arrêt brutal pendant `npm run build` (« Killed », ou plus aucun message)
+signifie que la limite mémoire est atteinte : repassez à la construction
 locale.
+
+> Construire sur le serveur a un avantage : le binaire natif de `sharp` est
+> alors celui de Linux, et le `npm install` de l'étape précédente devient
+> inutile.
 
 ## 8. Entretien
 
