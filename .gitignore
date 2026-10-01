@@ -8,6 +8,7 @@
 
 # Sorties de tests et de build
 frontend/deploy/
+nogoya-frontend.zip
 frontend/test-results/
 frontend/playwright-report/
 frontend/.next/
