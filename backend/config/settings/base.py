@@ -36,6 +36,12 @@ DJANGO_APPS = [
     "django.contrib.humanize",
 ]
 
+# Lu ici parce que `storages` ne doit être installé que si on s'en sert :
+# un déploiement sans stockage objet (mutualisé) n'a pas à embarquer
+# django-storages et ses dépendances AWS, et Django refuserait de démarrer
+# sur une application déclarée mais absente.
+USE_S3 = env.bool("USE_S3", default=False)
+
 THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
@@ -43,7 +49,7 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     "drf_spectacular",
-    "storages",
+    *(["storages"] if USE_S3 else []),
 ]
 
 LOCAL_APPS = [
@@ -160,8 +166,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 # the local filesystem to any S3 API: AWS S3, Cloudflare R2 or a local MinIO.
 # Nothing in the application code knows which one is in use — see STORAGE.md.
 # ---------------------------------------------------------------------------
-USE_S3 = env.bool("USE_S3", default=False)
-
 if USE_S3:
     AWS_ACCESS_KEY_ID = env("S3_ACCESS_KEY")
     AWS_SECRET_ACCESS_KEY = env("S3_SECRET_KEY")
