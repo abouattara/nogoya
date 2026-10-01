@@ -7,6 +7,7 @@
 .claude/settings.local.json
 
 # Sorties de tests et de build
+frontend/deploy/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.next/
