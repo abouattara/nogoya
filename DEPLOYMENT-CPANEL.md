@@ -276,10 +276,15 @@ Les deux ne peuvent pas partager un nom d'hôte : c'est la première erreur à
 
 | Champ | Valeur |
 |---|---|
+| Node.js version | **22.x** ou 20.x — Next 16 exige ≥ 20.9.0, et la 18 proposée par défaut ne suffit pas |
 | Application mode | **Production** — et non Development : ce champ pilote `NODE_ENV`, et un build de production doit tourner avec `NODE_ENV=production` |
 | Application root | `nogoya-node` |
 | Application URL | `binogoya.com` |
 | Application startup file | `server.js` |
+
+> Changer la version de Node change le chemin de l'environnement virtuel
+> (`.../nogoya-node/18/` → `.../22/`). La commande d'activation affichée en
+> haut de l'écran change donc aussi : reprenez-la après chaque bascule.
 
 Variables d'environnement (bouton *ADD VARIABLE*) :
 
@@ -299,28 +304,33 @@ un compte mutualisé. **Construisez sur votre machine**, puis n'envoyez que
 le résultat :
 
 ```bash
-# Sur votre machine, dans frontend/
+# dans frontend/
 NEXT_PUBLIC_API_URL=https://api.binogoya.com API_URL=https://api.binogoya.com npm run build
+npm run deploy:pack
 ```
 
-Le build produit `.next/standalone`, qui embarque son propre
-`node_modules` réduit. Assemblez le dossier à envoyer :
+`deploy:pack` assemble le dossier `deploy/` et règle trois pièges que
+`next build` laisse derrière lui :
 
-```bash
-mkdir -p deploy
-cp -r .next/standalone/* deploy/
-mkdir -p deploy/.next
-cp -r .next/static deploy/.next/static
-cp -r public deploy/ 2>/dev/null || true
-```
+| Piège | Ce que fait le script |
+|---|---|
+| `.next/static` et `public` ne sont pas copiés par Next | il les ajoute — sans eux, le site s'affiche **sans aucun style** |
+| Le binaire natif de `sharp` correspond à la machine du build | il retire les variantes d'autres plateformes. Un build Windows embarque `@img/sharp-win32-x64`, inutilisable sous Linux : `/_next/image` renverrait 500 et **plus aucune photo ne s'afficherait** |
+| La `package.json` recopiée liste *toutes* les dépendances | il la remplace par le strict nécessaire. Sinon un `npm install` sur le serveur — ou le bouton « Run NPM Install » — téléchargerait Playwright, Vitest et le reste : plus de 500 Mo |
 
-Volumes constatés sur ce projet : **28 Mo** pour `standalone`, 1,5 Mo pour
-`static` — contre 504 Mo pour un `node_modules` complet, qu'il est donc
-inutile d'envoyer.
+Le dossier obtenu pèse **29 Mo** (1 523 fichiers), contre 504 Mo pour un
+`node_modules` complet.
 
 Compressez `deploy/` en `.zip`, déposez-le dans `nogoya-node` via le
-Gestionnaire de fichiers, extrayez-le, puis **Restart** dans *Setup Node.js
-App*.
+Gestionnaire de fichiers, extrayez-le. Puis, dans le Terminal, environnement
+Node activé :
+
+```bash
+cd ~/nogoya-node
+npm install        # récupère le binaire Linux de sharp, quelques Mo
+```
+
+Enfin **Restart** dans *Setup Node.js App*.
 
 L'arborescence finale doit être :
 

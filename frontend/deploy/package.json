@@ -1,0 +1,11 @@
+{
+  "name": "nogoya-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "sharp": "0.35.4"
+  }
+}
