@@ -457,6 +457,46 @@ Si `/readyz/` renvoie `cache: error`, c'est que `createcachetable` n'a pas
 
 ---
 
+## Le piège : ModSecurity refuse les envois de fichiers
+
+**Symptôme.** Tout formulaire contenant une photo échoue. Le visiteur voit
+un message d'erreur sans détail, parce que la réponse n'est pas du JSON :
+c'est une page HTML `403 Forbidden` signée LiteSpeed. Les journaux de
+Django, eux, sont vides — la requête ne lui parvient jamais.
+
+**Mesure.** Mêmes octets, seul l'en-tête change :
+
+| Requête | Résultat |
+| --- | --- |
+| `POST` JSON | 401 Django ✔ |
+| `POST` multipart **sans** `filename=` | 401 Django ✔ |
+| `POST` multipart **avec** `filename=` | **403 LiteSpeed** ✘ |
+
+Ni le nom du champ, ni l'extension, ni le type MIME, ni la taille (testé de
+100 octets à 500 Ko) ne changent quoi que ce soit. Le filtre n'inspecte le
+corps que lorsque l'en-tête annonce un formulaire.
+
+**Contournement, déjà en place.** Le client envoie le même corps multipart
+étiqueté `application/octet-stream`, la frontière voyageant dans l'en-tête
+`X-Upload-Boundary` ; le serveur remet l'étiquette d'origine avant de
+confier les octets au parseur de Django.
+
+- client : `frontend/src/lib/multipart.ts`, appliqué dans `client-api.ts`
+  (fetch) et `upload.ts` (XHR avec barre de progression) ;
+- serveur : `backend/apps/core/parsers.py`, branché dans
+  `DEFAULT_PARSER_CLASSES` et sur les trois points d'entrée qui déclarent
+  leurs propres parseurs.
+
+Le `multipart/form-data` normal reste accepté : l'admin Django, les tests et
+un hébergeur sans ce filtre fonctionnent sans changement.
+
+**Si l'on peut faire mieux.** cPanel expose parfois *Security →
+ModSecurity*, où la règle se désactive par domaine. Cela rend le
+contournement inutile sans le casser — mais c'est une décision de
+l'hébergeur, qui peut la reprendre : le contournement reste la garantie.
+
+---
+
 ## Limites connues de cet hébergement
 
 À savoir avant de s'engager sur du volume :

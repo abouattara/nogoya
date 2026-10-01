@@ -4,6 +4,7 @@ from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from apps.core.parsers import WrappedMultiPartParser
 from rest_framework import mixins, parsers, permissions, renderers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -72,7 +73,12 @@ class ConversationViewSet(
     @action(
         detail=True,
         methods=["get", "post"],
-        parser_classes=[parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser],
+        parser_classes=[
+            parsers.JSONParser,
+            parsers.MultiPartParser,
+            parsers.FormParser,
+            WrappedMultiPartParser,
+        ],
     )
     def messages(self, request, pk=None):
         conversation = self.get_object()

@@ -5,6 +5,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
+
+from apps.core.parsers import WrappedMultiPartParser
 from rest_framework.response import Response
 
 from apps.analytics.services import record_contact_event, record_product_view, record_search_event
@@ -143,7 +145,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         # Any content edit re-enters moderation (mirrors the SSR flow it replaces).
         serializer.save(status=Product.Status.PENDING, published_at=None)
 
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser, WrappedMultiPartParser])
     def upload_images(self, request, slug=None):
         product = self.get_object()
         files = request.FILES.getlist("images")
@@ -287,7 +289,7 @@ class ProductImageViewSet(
         if image.is_cover:
             image.product.images.exclude(pk=image.pk).update(is_cover=False)
 
-    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser, WrappedMultiPartParser])
     def replace(self, request, pk=None):
         """Swap the rendered file of an already-published image.
 

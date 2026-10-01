@@ -242,6 +242,15 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+    # Les trois parseurs par défaut de DRF, plus celui qui accepte un corps
+    # multipart encapsulé : certains hébergeurs rejettent les formulaires de
+    # fichiers avant Django (voir apps/core/parsers.py).
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+        "apps.core.parsers.WrappedMultiPartParser",
+    ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -288,8 +297,9 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"]
 )
 CORS_ALLOW_CREDENTIALS = True
-# The anonymous visitor id travels as a header (see apps.core.middleware).
-CORS_ALLOW_HEADERS = (*cors_default_headers, "x-visitor-id")
+# The anonymous visitor id travels as a header (see apps.core.middleware),
+# and so does the boundary of an encapsulated upload (apps.core.parsers).
+CORS_ALLOW_HEADERS = (*cors_default_headers, "x-visitor-id", "x-upload-boundary")
 
 # ---------------------------------------------------------------------------
 # Logging (console; replaces the old print() debugging)

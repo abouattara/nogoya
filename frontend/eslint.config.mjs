@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Sortie de `npm run deploy:pack` : du code déjà compilé, recopié tel
+    // quel. Le lire noyait les vrais avertissements sous 145 erreurs.
+    "deploy/**",
   ]),
 ]);
 

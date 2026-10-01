@@ -240,7 +240,10 @@ export function ProductForm({ mode, product }: ProductFormProps) {
               .map((m) => String(m))
               .join(" ")
           : "";
-        setServerError(messages || "Enregistrement impossible.");
+        // Sans corps JSON exploitable, l'erreur vient d'un intermédiaire
+        // (proxy, pare-feu applicatif) et non de l'API : afficher le code
+        // évite un message opaque impossible à diagnostiquer.
+        setServerError(messages || `Enregistrement impossible (erreur ${err.status}).`);
       } else {
         setServerError("Enregistrement impossible pour le moment.");
       }

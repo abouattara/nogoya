@@ -2,6 +2,7 @@
 
 import { useAuthStore } from "@/store/auth-store";
 import { VISITOR_HEADER, readVisitorCookie } from "@/lib/visitor";
+import { UPLOAD_BOUNDARY_HEADER, UPLOAD_CONTENT_TYPE, encodeFormData } from "@/lib/multipart";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -87,6 +88,16 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   const finalHeaders: HeadersInit = { Accept: "application/json", ...headers };
+
+  // L'hébergeur rejette les formulaires de fichiers avant Django : on envoie
+  // le même corps multipart sous une autre étiquette. Voir lib/multipart.ts.
+  if (rest.body instanceof FormData) {
+    const encoded = encodeFormData(rest.body);
+    rest.body = encoded.body;
+    (finalHeaders as Record<string, string>)["Content-Type"] = UPLOAD_CONTENT_TYPE;
+    (finalHeaders as Record<string, string>)[UPLOAD_BOUNDARY_HEADER] = encoded.boundary;
+  }
+
   // Same anonymous id as the SSR calls: Django is on another origin, so its
   // own cookie would be third-party and is not sent here.
   const visitorId = readVisitorCookie();

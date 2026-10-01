@@ -3,6 +3,7 @@
 import { refreshAccessToken } from "@/lib/client-api";
 import { useAuthStore } from "@/store/auth-store";
 import { VISITOR_HEADER, readVisitorCookie } from "@/lib/visitor";
+import { UPLOAD_BOUNDARY_HEADER, UPLOAD_CONTENT_TYPE, encodeFormData } from "@/lib/multipart";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -40,8 +41,14 @@ export function uploadWithProgress(
     if (!token) token = await refreshAccessToken();
 
     return new Promise((resolve, reject) => {
+      // Même encapsulation que dans apiFetch : sans elle, l'envoi est
+      // refusé par l'hébergeur avant d'atteindre Django.
+      const encoded = encodeFormData(body);
+
       request.open("POST", new URL(path, API_URL).toString());
       request.setRequestHeader("Accept", "application/json");
+      request.setRequestHeader("Content-Type", UPLOAD_CONTENT_TYPE);
+      request.setRequestHeader(UPLOAD_BOUNDARY_HEADER, encoded.boundary);
       if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);
       const visitorId = readVisitorCookie();
       if (visitorId) request.setRequestHeader(VISITOR_HEADER, visitorId);
@@ -75,7 +82,7 @@ export function uploadWithProgress(
         reject(new UploadError(0, "Connexion interrompue pendant l'envoi."));
       request.onabort = () => reject(new UploadError(0, "Envoi annulé."));
 
-      request.send(body);
+      request.send(encoded.body);
     });
   })();
 
