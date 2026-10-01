@@ -127,3 +127,55 @@ class WrappedMultiPartParserTests(APITestCase):
         resp = self._post(body)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.product.images.count(), 0)
+
+
+@override_settings(MEDIA_ROOT=MEDIA, CELERY_TASK_ALWAYS_EAGER=True)
+class WrappedChatAttachmentTests(APITestCase):
+    """Le chat passe par la même voie : texte, fichier et champs répétés.
+
+    Le point d'entrée des messages lit `request.data.getlist("durations")`
+    en plus de `request.FILES` ; ce test vérifie que l'encapsulation ne
+    casse ni l'un ni l'autre.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        category = Category.objects.create(name="Tentes")
+        self.supplier = User.objects.create_user(
+            phone="+22670070101", password="pw", role=User.Role.SUPPLIER
+        )
+        self.visitor = User.objects.create_user(
+            phone="+22670070102", password="pw", role=User.Role.VISITOR
+        )
+        product = Product.objects.create(
+            supplier=self.supplier.supplier_profile, category=category,
+            title="Tente", price=5000, city="Bobo", status=Product.Status.APPROVED,
+        )
+        self.client.force_authenticate(self.visitor)
+        self.conversation_id = self.client.post(
+            reverse("api:conversation-list"), {"product": product.pk}
+        ).data["id"]
+
+    def test_voice_note_and_text_survive_the_encapsulation(self):
+        webm = b"\x1a\x45\xdf\xa3" + b"\x00" * 512
+        body = encode_multipart([
+            ("body", "Voici le vocal"),
+            ("audios", ("voice.webm", webm, "audio/webm")),
+            ("durations", "7"),
+        ])
+        resp = self.client.post(
+            reverse("api:conversation-messages", args=[self.conversation_id]),
+            data=body,
+            content_type="application/octet-stream",
+            HTTP_X_UPLOAD_BOUNDARY=BOUNDARY,
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data["body"], "Voici le vocal")
+        attachment = resp.data["attachments"][0]
+        self.assertEqual(attachment["kind"], "audio")
+        # Le champ répété est bien arrivé jusqu'à `getlist`.
+        self.assertEqual(attachment["duration"], 7)
