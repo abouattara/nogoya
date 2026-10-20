@@ -1,7 +1,26 @@
 export type Role = "visitor" | "supplier";
 export type ListingType = "rent" | "sale";
 export type RentalPeriod = "hour" | "day" | "week" | "month" | "none";
-export type ProductStatus = "pending" | "approved" | "rejected";
+export type ProductStatus =
+  | "draft"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "unavailable"
+  | "archived";
+
+/**
+ * Qui repond de l'annonce. `nogoya_owner` est la seule provenance pour
+ * laquelle le site peut engager un contact ou une reservation ; les deux
+ * autres renvoient vers l'annonceur.
+ */
+export type Provenance = "nogoya_owner" | "authorized_partner" | "external_reference";
+
+export interface ListingSourceRef {
+  name: string;
+  reference_url: string;
+}
 
 export interface Paginated<T> {
   count: number;
@@ -111,6 +130,9 @@ export interface ProductListItem {
   is_active: boolean;
   is_favorite: boolean;
   created_at: string;
+  provenance: Provenance;
+  /** Nom de la source pour une annonce referencee, `null` sinon. */
+  source_name: string | null;
 }
 
 export interface Favorite {
@@ -121,7 +143,8 @@ export interface Favorite {
 
 export interface ProductDetail extends Omit<ProductListItem, "category"> {
   description: string;
-  supplier: SupplierPublic;
+  /** `null` pour une annonce referencee : NOGOYA ne loue pas ce bien. */
+  supplier: SupplierPublic | null;
   images: ProductImage[];
   published_at: string | null;
   category: Category | null;
@@ -133,6 +156,9 @@ export interface ProductDetail extends Omit<ProductListItem, "category"> {
   location_precision: LocationPrecision;
   map_url: string | null;
   attributes: ProductAttribute[];
+  source: ListingSourceRef | null;
+  source_url: string;
+  last_checked_at: string | null;
 }
 
 export interface ProductWritePayload {
@@ -288,6 +314,9 @@ export interface ProductFiltersQuery {
   listing_type?: ListingType;
   price_min?: string;
   price_max?: string;
+  /** Quartier : recherche partielle sur le champ `location`. */
+  area?: string;
+  provenance?: string;
   ordering?: string;
   page?: string;
   mine?: "true";

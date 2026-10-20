@@ -11,10 +11,17 @@ class ProductFilter(filters.FilterSet):
     price_min = filters.NumberFilter(field_name="price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="price", lookup_expr="lte")
     favorites = filters.BooleanFilter(method="filter_favorites")
+    area = filters.CharFilter(field_name="location", lookup_expr="icontains")
+    rental_period = filters.ChoiceFilter(choices=Product.RentalPeriod.choices)
+    provenance = filters.ChoiceFilter(choices=Product.Provenance.choices)
+    source = filters.CharFilter(field_name="source__slug")
 
     class Meta:
         model = Product
-        fields = ["category", "city", "listing_type", "supplier", "price_min", "price_max"]
+        fields = [
+            "category", "city", "listing_type", "supplier", "price_min", "price_max",
+            "area", "rental_period", "provenance", "source",
+        ]
 
     def filter_favorites(self, queryset, name, value):
         user = getattr(self.request, "user", None)

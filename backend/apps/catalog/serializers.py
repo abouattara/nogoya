@@ -65,6 +65,17 @@ class ProductAttributeValueSerializer(serializers.ModelSerializer):
         fields = ["slug", "name", "attribute_type", "unit", "value"]
 
 
+class ListingSourceSerializer(serializers.Serializer):
+    """Ce qu'on dit au visiteur d'une annonce qui n'est pas la nôtre.
+
+    Le nom de la source et le lien d'origine, pas davantage : la
+    configuration technique, l'autorisation et les clés restent internes.
+    """
+
+    name = serializers.CharField(read_only=True)
+    reference_url = serializers.URLField(read_only=True)
+
+
 class ProductListSerializer(serializers.ModelSerializer):
     """Trimmed-down payload for listing/search results (card view)."""
 
@@ -72,6 +83,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(slug_field="slug", read_only=True)
     supplier_name = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
+    source_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -79,8 +91,13 @@ class ProductListSerializer(serializers.ModelSerializer):
             "id", "title", "slug", "category", "price", "currency",
             "listing_type", "rental_period", "city", "cover_image",
             "views_count", "shares_count", "supplier_name", "status", "is_active",
-            "is_favorite", "created_at",
+            "is_favorite", "created_at", "provenance", "source_name",
         ]
+
+    def get_source_name(self, obj):
+        if not obj.is_externally_sourced:
+            return None
+        return obj.source.name if obj.source_id else "Source externe"
 
     def get_cover_image(self, obj):
         image = obj.cover_image
@@ -91,6 +108,11 @@ class ProductListSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(url) if request else url
 
     def get_supplier_name(self, obj):
+        # Une annonce référencée n'a pas de fournisseur NOGOYA : le compte
+        # de service qui la porte techniquement ne doit jamais apparaître
+        # comme son vendeur. On nomme la source, qui est la vérité.
+        if obj.is_externally_sourced:
+            return obj.source.name if obj.source_id else "Source externe"
         user = obj.supplier.user
         return user.get_full_name() or user.phone
 
@@ -108,19 +130,32 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 class ProductDetailSerializer(ProductListSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
-    supplier = SupplierPublicSerializer(read_only=True)
+    supplier = serializers.SerializerMethodField()
     category = CategorySerializer(read_only=True)
     latitude = serializers.SerializerMethodField()
     longitude = serializers.SerializerMethodField()
     map_url = serializers.ReadOnlyField()
     attributes = ProductAttributeValueSerializer(source="attribute_values", many=True, read_only=True)
+    source = ListingSourceSerializer(read_only=True)
 
     class Meta(ProductListSerializer.Meta):
         fields = ProductListSerializer.Meta.fields + [
             "description", "supplier", "images", "published_at",
             "location", "region", "country", "latitude", "longitude",
             "location_precision", "map_url", "attributes",
+            "source", "source_url", "last_checked_at",
         ]
+
+    def get_supplier(self, obj):
+        """`null` pour une annonce référencée — il n'y a pas de fournisseur.
+
+        Renvoyer le compte de service ici reviendrait à présenter NOGOYA
+        comme le loueur d'un bien qu'elle ne loue pas. Le frontend s'appuie
+        sur ce `null` pour basculer vers le parcours « annonce externe ».
+        """
+        if obj.is_externally_sourced:
+            return None
+        return SupplierPublicSerializer(obj.supplier, context=self.context).data
 
     def get_latitude(self, obj):
         return obj.public_latitude

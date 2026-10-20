@@ -17,6 +17,8 @@ interface SearchParams {
   listing_type?: string;
   price_min?: string;
   price_max?: string;
+  area?: string;
+  provenance?: string;
   page?: string;
 }
 
@@ -53,6 +55,8 @@ async function Results({ params }: { params: SearchParams }) {
     listing_type: params.listing_type as ListingType | undefined,
     price_min: params.price_min,
     price_max: params.price_max,
+    area: params.area,
+    provenance: params.provenance,
     ordering: "-created_at",
     page: params.page,
     attributes: pickAttributeParams(params),

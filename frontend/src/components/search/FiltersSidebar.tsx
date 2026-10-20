@@ -35,8 +35,10 @@ export function FiltersSidebar({ categories }: { categories: Category[] }) {
   const searchParams = useSearchParams();
   const activeCategory = searchParams.get("category");
   const activeListingType = searchParams.get("listing_type");
+  const activeProvenance = searchParams.get("provenance");
 
   const [city, setCity] = useState(searchParams.get("city") ?? "");
+  const [area, setArea] = useState(searchParams.get("area") ?? "");
   const [priceMin, setPriceMin] = useState(searchParams.get("price_min") ?? "");
   const [priceMax, setPriceMax] = useState(searchParams.get("price_max") ?? "");
 
@@ -46,6 +48,7 @@ export function FiltersSidebar({ categories }: { categories: Category[] }) {
     e.preventDefault();
     let params = new URLSearchParams(searchParams.toString());
     params = new URLSearchParams(withParam(params, "city", city));
+    params = new URLSearchParams(withParam(params, "area", area));
     params = new URLSearchParams(withParam(params, "price_min", priceMin));
     params = new URLSearchParams(withParam(params, "price_max", priceMax));
     router.push(`/produits?${params.toString()}`);
@@ -107,11 +110,42 @@ export function FiltersSidebar({ categories }: { categories: Category[] }) {
         </ul>
       </div>
 
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Origine de l&apos;annonce</h3>
+        {/* Un visiteur venu reserver n'a que faire des annonces qu'il
+            devra traiter ailleurs : il doit pouvoir les ecarter. */}
+        <ul className="flex flex-col gap-1">
+          <FilterLink
+            label="Toutes"
+            active={!activeProvenance}
+            href={`/produits?${withParam(searchParams, "provenance")}`}
+          />
+          <FilterLink
+            label="Gerees par NOGOYA"
+            active={activeProvenance === "nogoya_owner"}
+            href={`/produits?${withParam(searchParams, "provenance", "nogoya_owner")}`}
+          />
+          <FilterLink
+            label="Partenaires"
+            active={activeProvenance === "authorized_partner"}
+            href={`/produits?${withParam(searchParams, "provenance", "authorized_partner")}`}
+          />
+          <FilterLink
+            label="Annonces referencees"
+            active={activeProvenance === "external_reference"}
+            href={`/produits?${withParam(searchParams, "provenance", "external_reference")}`}
+          />
+        </ul>
+      </div>
+
       <form onSubmit={applyText} className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Ville</h3>
         <Input placeholder="Ouagadougou, Bobo..." value={city} onChange={(e) => setCity(e.target.value)} />
 
-        <h3 className="text-sm font-semibold">Prix</h3>
+        <h3 className="text-sm font-semibold">Quartier</h3>
+        <Input placeholder="Ouaga 2000, Gounghin..." value={area} onChange={(e) => setArea(e.target.value)} />
+
+        <h3 className="text-sm font-semibold">Budget</h3>
         <div className="flex gap-2">
           <Input placeholder="Min" inputMode="numeric" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} />
           <Input placeholder="Max" inputMode="numeric" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} />

@@ -62,6 +62,7 @@ LOCAL_APPS = [
     "apps.media",
     "apps.notifications",
     "apps.live",
+    "apps.sourcing",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -202,6 +203,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Ceilings on what reaches the server. The browser already shrinks images
 # and refuses long videos, but a client is only ever a convenience: these
 # are the numbers that protect the bucket bill.
+# Dossier ou les partenaires deposent leurs exports CSV. Hors du depot :
+# ce sont leurs donnees, et elles n'ont rien a faire dans Git.
+SOURCING_IMPORT_DIR = env("SOURCING_IMPORT_DIR", default=str(BASE_DIR / "imports"))
+
 MAX_IMAGE_UPLOAD_BYTES = env.int("MAX_IMAGE_UPLOAD_BYTES", default=12 * 1024 * 1024)
 MAX_AUDIO_UPLOAD_BYTES = env.int("MAX_AUDIO_UPLOAD_BYTES", default=10 * 1024 * 1024)
 MAX_VIDEO_UPLOAD_BYTES = env.int("MAX_VIDEO_UPLOAD_BYTES", default=100 * 1024 * 1024)

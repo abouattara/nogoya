@@ -436,6 +436,28 @@ Sauvegardes : cPanel → *Backup Wizard* pour la base, et une copie du dossier
 `media/` — les images d'annonces ne sont nulle part ailleurs tant que
 `USE_S3` est désactivé.
 
+### Import des annonces référencées
+
+Il n'y a pas de worker Celery sur un mutualisé : l'import récurrent passe
+lui aussi par une tâche planifiée.
+
+```
+30 */6 * * * source /home/UTILISATEUR/virtualenv/nogoya/backend/3.12/bin/activate && cd /home/UTILISATEUR/nogoya/backend && python manage.py import_listings --all
+```
+
+La fréquence de la tâche n'est qu'un plafond : chaque source porte son
+propre `min_interval_minutes` et sera sautée si elle est relancée trop tôt.
+Un partenaire qui n'accepte qu'un passage par jour le déclare une fois, et
+aucune modification de la `crontab` ne peut l'enfreindre par distraction.
+
+Et une purge mensuelle des données brutes conservées pour diagnostic :
+
+```
+0 4 1 * * source /home/UTILISATEUR/virtualenv/nogoya/backend/3.12/bin/activate && cd /home/UTILISATEUR/nogoya/backend && python manage.py prune_import_payloads --days 30
+```
+
+Procédure complète des sources dans `SOURCING.md`.
+
 ---
 
 ## 9. Vérifications après mise en ligne

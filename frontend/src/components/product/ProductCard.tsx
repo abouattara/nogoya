@@ -35,6 +35,13 @@ export function ProductCard({ product }: { product: ProductListItem }) {
       <div className="flex flex-1 flex-col gap-1 p-3">
         <p className="line-clamp-1 text-sm font-medium">{product.title}</p>
         <p className="text-xs text-foreground-muted">{product.city}</p>
+        {/* Dit dès la liste que le bien n'est pas géré par NOGOYA : le
+            visiteur sait avant de cliquer qu'il sera renvoyé ailleurs. */}
+        {product.source_name && (
+          <p className="line-clamp-1 text-xs text-foreground-muted">
+            Annonce référencée · {product.source_name}
+          </p>
+        )}
         <div className="mt-auto flex items-center justify-between pt-1">
           <p className="text-sm font-semibold text-brand-dark">
             {formatPrice(product.price, product.currency)}

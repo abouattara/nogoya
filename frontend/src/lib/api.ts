@@ -15,6 +15,8 @@ export async function getProducts(query: ProductFiltersQuery) {
       listing_type: query.listing_type,
       price_min: query.price_min,
       price_max: query.price_max,
+      area: query.area,
+      provenance: query.provenance,
       ordering: query.ordering,
       page: query.page,
       // Dynamic per-category filters (attr_<slug>, attr_<slug>_min/_max).

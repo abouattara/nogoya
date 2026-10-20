@@ -81,7 +81,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductWriteSerializer
 
     def get_queryset(self):
-        qs = Product.objects.select_related("category", "supplier__user").prefetch_related("images")
+        # `source` est joint ici : sans cela chaque carte d'annonce
+        # référencée déclencherait sa propre requête pour nommer sa source.
+        qs = Product.objects.select_related(
+            "category", "supplier__user", "source"
+        ).prefetch_related("images")
         user = self.request.user
         if self.action == "list":
             if self.request.query_params.get("mine") == "true" and user.is_authenticated:
@@ -190,6 +194,17 @@ class ProductViewSet(viewsets.ModelViewSet):
         counts genuine intent to reach out, not every page view.
         """
         product = self.get_object()
+        # Une annonce référencée n'a pas de fournisseur NOGOYA à joindre :
+        # le seul geste honnête est de renvoyer vers l'annonce d'origine.
+        if product.is_externally_sourced:
+            return Response(
+                {
+                    "detail": "Cette annonce est référencée depuis une source externe : "
+                              "le contact se fait sur l'annonce d'origine.",
+                    "source_url": product.source_url,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         channel = request.data.get("channel", "phone")
         if channel not in ("phone", "whatsapp"):
             channel = "phone"

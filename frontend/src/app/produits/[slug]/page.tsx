@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/Feedback";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ContactSupplierCard } from "@/components/product/ContactSupplierCard";
+import { ExternalListingCard } from "@/components/product/ExternalListingCard";
 import { ShareButton } from "@/components/product/ShareButton";
 import { FavoriteButton } from "@/components/product/FavoriteButton";
 import { getProduct } from "@/lib/api";
@@ -133,7 +134,18 @@ export default async function ProductDetailPage({ params }: PageProps<"/produits
         </div>
 
         <div className="lg:sticky lg:top-20 lg:h-fit">
-          <ContactSupplierCard slug={product.slug} productId={product.id} supplier={product.supplier} productTitle={product.title} />
+          {/* Deux parcours distincts : NOGOYA ne propose un contact que
+              pour les biens dont elle repond. */}
+          {product.supplier ? (
+            <ContactSupplierCard
+              slug={product.slug}
+              productId={product.id}
+              supplier={product.supplier}
+              productTitle={product.title}
+            />
+          ) : (
+            <ExternalListingCard product={product} />
+          )}
         </div>
       </div>
     </div>

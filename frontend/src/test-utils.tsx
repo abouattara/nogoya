@@ -39,6 +39,8 @@ export function makeProduct(overrides: Partial<ProductListItem> = {}): ProductLi
     is_active: true,
     is_favorite: false,
     created_at: "2026-09-01T10:00:00Z",
+    provenance: "nogoya_owner",
+    source_name: null,
     ...overrides,
   };
 }

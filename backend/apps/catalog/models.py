@@ -111,9 +111,30 @@ class Product(TimeStampedModel):
         NONE = "none", _("—")
 
     class Status(models.TextChoices):
-        PENDING = "pending", _("En attente")
-        APPROVED = "approved", _("Approuvé")
-        REJECTED = "rejected", _("Rejeté")
+        """Cycle de vie d'une annonce.
+
+        Les codes `pending` et `approved` sont antérieurs au référencement
+        externe et n'ont **pas** été renommés en `pending_review` et
+        `published` : ils sont écrits en base en production, comparés par le
+        frontend et par les tests de bout en bout. Un renommage n'aurait
+        rien apporté qu'un libellé, contre un risque réel sur des données
+        vivantes. Les libellés, eux, disent le vocabulaire retenu.
+        """
+
+        DRAFT = "draft", _("Brouillon")
+        PENDING = "pending", _("En attente de validation")
+        APPROVED = "approved", _("Publiée")
+        REJECTED = "rejected", _("Rejetée")
+        EXPIRED = "expired", _("Expirée")
+        UNAVAILABLE = "unavailable", _("Indisponible")
+        ARCHIVED = "archived", _("Archivée")
+
+    class Provenance(models.TextChoices):
+        """Qui répond de l'annonce — et donc ce que le visiteur peut en faire."""
+
+        NOGOYA_OWNER = "nogoya_owner", _("Bien géré par un membre NOGOYA")
+        AUTHORIZED_PARTNER = "authorized_partner", _("Bien fourni par un partenaire autorisé")
+        EXTERNAL_REFERENCE = "external_reference", _("Annonce externe référencée")
 
     class LocationPrecision(models.TextChoices):
         EXACT = "exact", _("Position exacte")
@@ -158,6 +179,29 @@ class Product(TimeStampedModel):
         _("statut"), max_length=12, choices=Status.choices, default=Status.PENDING,
         db_index=True,
     )
+
+    # --- provenance --------------------------------------------------------
+    # `supplier` reste obligatoire : des dizaines d'endroits lisent
+    # `product.supplier.user`. Pour une annonce référencée, ce champ désigne
+    # le compte de service qui a procédé à l'import, **jamais un
+    # propriétaire**. C'est `provenance` qui tranche, et les sérialiseurs
+    # n'exposent le profil fournisseur que pour `nogoya_owner`.
+    provenance = models.CharField(
+        _("provenance"), max_length=20, choices=Provenance.choices,
+        default=Provenance.NOGOYA_OWNER, db_index=True,
+    )
+    source = models.ForeignKey(
+        "sourcing.ListingSource", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="products", verbose_name=_("source d'origine"),
+    )
+    source_url = models.URLField(
+        _("URL de l'annonce d'origine"), max_length=500, blank=True,
+        help_text=_("Affichée au visiteur : une annonce référencée renvoie toujours chez elle."),
+    )
+    last_checked_at = models.DateTimeField(
+        _("dernière vérification"), null=True, blank=True,
+        help_text=_("Date à laquelle la source a confirmé que l'annonce existait encore."),
+    )
     is_active = models.BooleanField(
         _("visible"), default=True,
         help_text=_("Le fournisseur peut dépublier une annonce approuvée sans repasser par la modération."),
@@ -191,6 +235,17 @@ class Product(TimeStampedModel):
         The listing page lives in the Next.js frontend, not here.
         """
         return f"{settings.FRONTEND_URL}/produits/{self.slug}"
+
+    @property
+    def is_externally_sourced(self):
+        """Vrai dès que NOGOYA n'est pas en mesure d'engager la transaction.
+
+        Un partenaire autorisé fournit ses biens, mais c'est lui qui les
+        loue : dans les deux cas le visiteur doit être renvoyé vers
+        l'annonceur, pas vers un parcours de réservation que le site ne peut
+        pas honorer.
+        """
+        return self.provenance != self.Provenance.NOGOYA_OWNER
 
     @property
     def cover_image(self):

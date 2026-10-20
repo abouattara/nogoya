@@ -13,9 +13,16 @@ import { formatPrice } from "@/lib/format";
 import type { Paginated, ProductListItem, ProductStatus, SupplierStats } from "@/lib/types";
 
 const STATUS_LABEL: Record<ProductStatus, { label: string; tone: "warning" | "brand" | "danger" }> = {
+  // `draft` et les trois derniers états n'apparaissent au tableau de bord
+  // d'un fournisseur que pour une annonce reprise en main par l'équipe ;
+  // ils y figurent quand même, sans quoi le badge serait vide.
+  draft: { label: "Brouillon", tone: "warning" },
   pending: { label: "En attente de modération", tone: "warning" },
   approved: { label: "Approuvée", tone: "brand" },
   rejected: { label: "Rejetée", tone: "danger" },
+  expired: { label: "Expirée", tone: "danger" },
+  unavailable: { label: "Indisponible", tone: "danger" },
+  archived: { label: "Archivée", tone: "danger" },
 };
 
 export default function SupplierDashboardPage() {
