@@ -20,6 +20,14 @@ const { apiFetch, FakeApiError } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/client-api", () => ({ apiFetch, ApiError: FakeApiError }));
 
+// jsdom n'a ni canvas ni createImageBitmap : la compression locale est
+// simulée. On vérifie qu'elle est bien demandée, et ce qui part ensuite.
+const { prepareImage } = vi.hoisted(() => ({ prepareImage: vi.fn() }));
+vi.mock("@/lib/media-prep", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/media-prep")>("@/lib/media-prep");
+  return { ...actual, prepareImage };
+});
+
 const CATEGORIES = [
   makeCategory({
     id: 1,
@@ -158,5 +166,88 @@ describe("ProductForm", () => {
       expect(screen.getByText("« Marque » est obligatoire.")).toBeInTheDocument()
     );
     expect(screen.getByText("Vérifiez les caractéristiques de l'annonce.")).toBeInTheDocument();
+  });
+});
+
+describe("ProductForm — envoi des photos", () => {
+  function photoFile(name: string) {
+    return new File([new Uint8Array(1024)], name, { type: "image/jpeg" });
+  }
+
+  function uploadCalls() {
+    return apiFetch.mock.calls.filter((call: unknown[]) =>
+      String(call[0]).includes("/upload_images/")
+    );
+  }
+
+  beforeEach(() => {
+    global.URL.createObjectURL = vi.fn((blob: Blob) => `blob:${(blob as File).name ?? "x"}`);
+    global.URL.revokeObjectURL = vi.fn();
+    apiFetch.mockImplementation((path: string) => {
+      if (path.includes("/categories/")) return Promise.resolve(CATEGORIES);
+      return Promise.resolve({ slug: "nouvelle-annonce" });
+    });
+    prepareImage.mockImplementation(async (file: File) => ({
+      // Une photo de 4 Mo ressort à 400 Ko : c'est tout l'intérêt.
+      file: new File([new Uint8Array(64)], file.name, { type: "image/jpeg" }),
+      width: 2000,
+      height: 1500,
+      previewUrl: `blob:${file.name}`,
+      originalSize: file.size,
+    }));
+  });
+
+  async function fillAndSubmit(files: File[]) {
+    renderWithProviders(<ProductForm mode="create" />);
+    await userEvent.type(screen.getByLabelText(/titre de l'annonce/i), "Berline confortable");
+    await userEvent.type(screen.getByLabelText(/description/i), "Une belle berline familiale");
+    await userEvent.type(screen.getByLabelText(/^prix$/i), "4500");
+    await userEvent.type(screen.getByLabelText(/^ville$/i), "Ouagadougou");
+    await waitFor(() => screen.getByRole("option", { name: /voitures/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/catégorie/i), "2");
+    await userEvent.type(await screen.findByLabelText("Marque *"), "Toyota");
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, files);
+    await waitFor(() => expect(prepareImage).toHaveBeenCalledTimes(files.length));
+
+    await userEvent.click(screen.getByRole("button", { name: /publier l'annonce/i }));
+  }
+
+  it("réduit chaque photo avant de l'envoyer, une requête par photo", async () => {
+    await fillAndSubmit([photoFile("a.jpg"), photoFile("b.jpg"), photoFile("c.jpg")]);
+
+    // Trois envois séparés, et non un seul portant les trois fichiers :
+    // l'hébergement redimensionne dans la requête, et trois d'un coup
+    // faisaient tomber le worker.
+    await waitFor(() => expect(uploadCalls()).toHaveLength(3));
+    for (const [, options] of uploadCalls()) {
+      const body = (options as { body: FormData }).body;
+      expect(body).toBeInstanceOf(FormData);
+      expect(body.getAll("images")).toHaveLength(1);
+    }
+  });
+
+  it("dit quelle photo a échoué, et que l'annonce est déjà enregistrée", async () => {
+    let upload = 0;
+    apiFetch.mockImplementation((path: string) => {
+      if (path.includes("/categories/")) return Promise.resolve(CATEGORIES);
+      if (path.includes("/upload_images/")) {
+        upload += 1;
+        // Un 503 sans corps JSON : typiquement une page d'erreur du serveur
+        // web, dont il ne reste que le code à montrer.
+        return upload === 2 ? Promise.reject(new FakeApiError(503, null)) : Promise.resolve({});
+      }
+      return Promise.resolve({ slug: "nouvelle-annonce" });
+    });
+
+    await fillAndSubmit([photoFile("a.jpg"), photoFile("b.jpg"), photoFile("c.jpg")]);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("photo 2 sur 3");
+    expect(alert).toHaveTextContent("erreur 503");
+    expect(alert).toHaveTextContent(/annonce a bien été enregistrée/i);
+    // La troisième n'est pas tentée : inutile d'insister si le serveur peine.
+    expect(uploadCalls()).toHaveLength(2);
   });
 });

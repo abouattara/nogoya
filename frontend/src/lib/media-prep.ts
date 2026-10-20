@@ -19,6 +19,19 @@
 const MAX_EDGE = 1280;
 const QUALITY = 0.82;
 
+/**
+ * Photo d'annonce : le serveur garde un « master » de 1600 px pour que
+ * recadrer plus tard reparte d'une image nette, donc on descend moins bas
+ * que pour le chat. Une photo de téléphone passe tout de même de ~6 Mo à
+ * quelques centaines de kilo-octets.
+ */
+export const PRODUCT_PHOTO = { maxEdge: 2000, quality: 0.85 };
+
+export interface PrepareOptions {
+  maxEdge?: number;
+  quality?: number;
+}
+
 export interface PreparedImage {
   file: File;
   width: number;
@@ -58,11 +71,16 @@ function canvasToFile(canvas: HTMLCanvasElement, name: string, quality = QUALITY
  * unusual HEIC, say): the server accepts those formats too, so the person
  * still gets their photo sent, just without the local saving.
  */
-export async function prepareImage(file: File): Promise<PreparedImage> {
+export async function prepareImage(
+  file: File,
+  options: PrepareOptions = {}
+): Promise<PreparedImage> {
+  const maxEdge = options.maxEdge ?? MAX_EDGE;
+  const quality = options.quality ?? QUALITY;
   const originalSize = file.size;
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const width = Math.round(bitmap.width * scale);
     const height = Math.round(bitmap.height * scale);
 
@@ -74,7 +92,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
     context.drawImage(bitmap, 0, 0, width, height);
     bitmap.close?.();
 
-    const prepared = await canvasToFile(canvas, renameToJpeg(file.name));
+    const prepared = await canvasToFile(canvas, renameToJpeg(file.name), quality);
     // Re-encoding a small, already-optimised picture can make it bigger.
     const best = prepared.size < file.size ? prepared : file;
     return { file: best, width, height, previewUrl: URL.createObjectURL(best), originalSize };

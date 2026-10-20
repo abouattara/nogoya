@@ -5,12 +5,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { apiFetch, ApiError } from "@/lib/client-api";
+import { PRODUCT_PHOTO, formatBytes, prepareImage } from "@/lib/media-prep";
 import type { AttributeValue, Category, LocationPrecision, ProductDetail } from "@/lib/types";
 import { ExistingImageManager } from "./ExistingImageManager";
 import { DynamicAttributeFields, type AttributeValues } from "./DynamicAttributeFields";
@@ -65,11 +66,55 @@ interface ProductFormProps {
   product?: ProductDetail; // required for edit
 }
 
+/** Échec sur une photo précise, l'annonce étant déjà enregistrée. */
+class PhotoUploadError extends Error {
+  constructor(
+    readonly index: number,
+    readonly total: number,
+    readonly cause: unknown
+  ) {
+    super(`photo ${index}/${total}`);
+  }
+
+  /** Ce qu'on peut dire de la cause, en une poignée de mots. */
+  reason(): string {
+    if (!(this.cause instanceof ApiError)) return "connexion interrompue";
+    const body = this.cause.body as Record<string, unknown> | null;
+    const messages = body
+      ? Object.values(body)
+          .flat()
+          .map((m) => String(m))
+          .join(" ")
+      : "";
+    // Sans corps JSON exploitable, la réponse vient d'un intermédiaire
+    // (proxy, pare-feu applicatif) : le code est alors la seule information.
+    return messages || `erreur ${this.cause.status}`;
+  }
+}
+
+/**
+ * Une photo choisie mais pas encore envoyée.
+ *
+ * L'URL de prévisualisation est gardée ici plutôt que fabriquée dans le
+ * rendu : `URL.createObjectURL()` appelé pendant le rendu créait un blob à
+ * chaque frappe au clavier, sans jamais le révoquer. Avec six photos, un
+ * formulaire rempli au téléphone finissait par retenir des centaines de
+ * copies des images en mémoire.
+ */
+interface NewPhoto {
+  file: File;
+  previewUrl: string;
+  /** Taille du fichier sorti de l'appareil, avant compression locale. */
+  originalSize: number;
+}
+
 export function ProductForm({ mode, product }: ProductFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [images, setImages] = useState<File[]>([]);
+  const [images, setImages] = useState<NewPhoto[]>([]);
   const [existingImages, setExistingImages] = useState(product?.images ?? []);
+  const [preparing, setPreparing] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<"idle" | "locating" | "done" | "denied">("idle");
   const [editingNewIndex, setEditingNewIndex] = useState<number | null>(null);
@@ -77,6 +122,14 @@ export function ProductForm({ mode, product }: ProductFormProps) {
     Object.fromEntries((product?.attributes ?? []).map((a) => [a.slug, a.value]))
   );
   const [attributeErrors, setAttributeErrors] = useState<Record<string, string>>({});
+
+  // Les URL de prévisualisation sont révoquées en quittant la page : sans
+  // cela, les octets des photos restent en mémoire jusqu'au rechargement.
+  const previewUrls = useRef<string[]>([]);
+  useEffect(() => {
+    previewUrls.current = images.map((photo) => photo.previewUrl);
+  }, [images]);
+  useEffect(() => () => previewUrls.current.forEach(URL.revokeObjectURL), []);
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -138,18 +191,49 @@ export function ProductForm({ mode, product }: ProductFormProps) {
     });
   }
 
-  function onFilesSelected(fileList: FileList | null) {
-    if (!fileList) return;
-    setImages((prev) => [...prev, ...Array.from(fileList)]);
+  /**
+   * Réduire les photos ici, avant l'envoi.
+   *
+   * Une photo de téléphone pèse 4 à 8 Mo pour 12 Mpx, alors que la plus
+   * grande version conservée fait 1600 px. Les envoyer brutes, c'est faire
+   * payer au vendeur un forfait data pour des pixels que le serveur jette —
+   * et, sur un hébergement mutualisé où le redimensionnement se fait dans
+   * la requête, c'est aussi ce qui la faisait échouer. Le chat procédait
+   * déjà ainsi ; le formulaire d'annonce, non.
+   */
+  async function onFilesSelected(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    setPreparing(true);
+    try {
+      const prepared = await Promise.all(
+        Array.from(fileList).map(async (file) => {
+          const { file: shrunk, previewUrl, originalSize } = await prepareImage(file, PRODUCT_PHOTO);
+          return { file: shrunk, previewUrl, originalSize };
+        })
+      );
+      setImages((prev) => [...prev, ...prepared]);
+    } finally {
+      setPreparing(false);
+    }
   }
 
   function removeNewImage(idx: number) {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
+    setImages((prev) => {
+      const gone = prev[idx];
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
     setEditingNewIndex(null);
   }
 
   function replaceNewImage(index: number, file: File) {
-    setImages((prev) => prev.map((existing, i) => (i === index ? file : existing)));
+    setImages((prev) =>
+      prev.map((existing, i) => {
+        if (i !== index) return existing;
+        URL.revokeObjectURL(existing.previewUrl);
+        return { file, previewUrl: URL.createObjectURL(file), originalSize: existing.originalSize };
+      })
+    );
     setEditingNewIndex(null);
   }
 
@@ -199,14 +283,26 @@ export function ProductForm({ mode, product }: ProductFormProps) {
         body: JSON.stringify(payload),
       });
 
-      if (images.length > 0) {
+      // Une requête par photo, et non les six d'un bloc. Sur l'hébergement
+      // mutualisé le redimensionnement se fait dans la requête : six photos
+      // ensemble, c'est six fois la mémoire et la durée d'un coup, et le
+      // worker se fait tuer — l'annonce était créée, mais sans aucune photo.
+      // Séparées, chacune est une requête courte, et un échec n'emporte plus
+      // que la photo concernée.
+      for (const [index, photo] of images.entries()) {
+        setUploadStatus(`Envoi de la photo ${index + 1} sur ${images.length}…`);
         const formData = new FormData();
-        images.forEach((file) => formData.append("images", file));
-        await apiFetch(`/api/v1/products/${saved.slug}/upload_images/`, {
-          method: "POST",
-          body: formData,
-        });
+        formData.append("images", photo.file);
+        try {
+          await apiFetch(`/api/v1/products/${saved.slug}/upload_images/`, {
+            method: "POST",
+            body: formData,
+          });
+        } catch (err) {
+          throw new PhotoUploadError(index + 1, images.length, err);
+        }
       }
+      setUploadStatus(null);
 
       // The dashboard lists are cached for 30s; without this the supplier
       // lands back on a table still showing what they just changed.
@@ -217,6 +313,17 @@ export function ProductForm({ mode, product }: ProductFormProps) {
       ]);
       router.push("/compte/fournisseur");
     } catch (err) {
+      setUploadStatus(null);
+      // À ce stade l'annonce existe déjà : le dire, plutôt que laisser
+      // croire que rien n'a été enregistré et provoquer un doublon — c'est
+      // ainsi que des annonces sans photo s'accumulaient.
+      if (err instanceof PhotoUploadError) {
+        setServerError(
+          `L'annonce a bien été enregistrée, mais l'envoi de la photo ${err.index} sur ${err.total} ` +
+            `a échoué (${err.reason()}). Ouvrez-la depuis « Mes annonces » pour ajouter les photos manquantes.`
+        );
+        return;
+      }
       if (err instanceof ApiError) {
         const body = err.body as Record<string, unknown> | null;
         // The API reports attribute problems as {attributes: {slug: msg}} —
@@ -360,12 +467,15 @@ export function ProductForm({ mode, product }: ProductFormProps) {
             <ExistingImageManager images={existingImages} onChange={setExistingImages} />
           </div>
         )}
+        {preparing && (
+          <p className="mt-2 text-xs text-foreground-muted">Préparation des photos…</p>
+        )}
         {images.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {images.map((file, idx) => (
-              <div key={idx} className="w-20 overflow-hidden rounded-lg border border-border">
+            {images.map((photo, idx) => (
+              <div key={photo.previewUrl} className="w-20 overflow-hidden rounded-lg border border-border">
                 <div className="relative h-20 w-20">
-                  <Image src={URL.createObjectURL(file)} alt="" fill className="object-cover" unoptimized />
+                  <Image src={photo.previewUrl} alt="" fill className="object-cover" unoptimized />
                   <button
                     type="button"
                     onClick={() => removeNewImage(idx)}
@@ -386,12 +496,19 @@ export function ProductForm({ mode, product }: ProductFormProps) {
             ))}
           </div>
         )}
+        {images.length > 0 && (
+          <p className="mt-2 text-xs text-foreground-muted">
+            {images.length} photo{images.length > 1 ? "s" : ""} —{" "}
+            {formatBytes(images.reduce((total, photo) => total + photo.originalSize, 0))} réduits à{" "}
+            {formatBytes(images.reduce((total, photo) => total + photo.file.size, 0))} avant envoi.
+          </p>
+        )}
       </div>
 
       {editingNewIndex !== null && images[editingNewIndex] && (
         <ImageEditor
-          src={URL.createObjectURL(images[editingNewIndex])}
-          fileName={images[editingNewIndex].name}
+          src={images[editingNewIndex].previewUrl}
+          fileName={images[editingNewIndex].file.name}
           onCancel={() => setEditingNewIndex(null)}
           onApply={(file) => replaceNewImage(editingNewIndex, file)}
         />
@@ -403,7 +520,13 @@ export function ProductForm({ mode, product }: ProductFormProps) {
         </p>
       )}
 
-      <Button type="submit" disabled={isSubmitting} className="mt-2">
+      {uploadStatus && (
+        <p role="status" className="text-sm text-foreground-muted">
+          {uploadStatus}
+        </p>
+      )}
+
+      <Button type="submit" disabled={isSubmitting || preparing} className="mt-2">
         {isSubmitting ? "Enregistrement..." : mode === "create" ? "Publier l'annonce" : "Enregistrer les modifications"}
       </Button>
       <p className="text-xs text-foreground-muted">

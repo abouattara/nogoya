@@ -45,11 +45,33 @@ class UnprocessableImage(Exception):
     """The bytes are not an image we can read."""
 
 
-def _open(file_or_bytes):
+def _fit_box(size, box):
+    """Les dimensions qu'aurait `size` une fois ramenée dans `box`."""
+    width, height = size
+    scale = min(box[0] / width, box[1] / height, 1)
+    return max(1, int(width * scale)), max(1, int(height * scale))
+
+
+def _open(file_or_bytes, target=MASTER_SIZE):
     try:
         if hasattr(file_or_bytes, "open"):
             file_or_bytes.open("rb")
         image = PILImage.open(file_or_bytes)
+        # Le décodeur JPEG sait sortir une image déjà réduite de moitié, d'un
+        # quart ou d'un huitième, sans jamais construire la pleine taille en
+        # mémoire. Une photo de téléphone de 12 Mpx occupe 36 Mo décodée ;
+        # visée à 1600 px, elle en occupe 9. C'est gratuit en qualité, le
+        # rééchantillonnage LANCZOS venant ensuite de toute façon — et sur un
+        # hébergement mutualisé, où le traitement se fait dans la requête,
+        # c'est autant de mémoire que le worker ne réclame pas.
+        #
+        # Attention au piège : `draft` traite sa taille comme un **minimum à
+        # conserver sur les deux côtés**, là où `thumbnail` la traite comme un
+        # maximum. Lui passer la boîte carrée (1600, 1600) ne réduit rien dès
+        # que la photo est en 4:3 — le petit côté, 3024/2 = 1512, tomberait
+        # sous 1600 et Pillow renonce. On lui passe donc les dimensions
+        # réellement visées, ratio compris.
+        image.draft("RGB", _fit_box(image.size, target))
         image.load()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise UnprocessableImage(str(exc)) from exc
@@ -61,13 +83,18 @@ def _open(file_or_bytes):
     return image
 
 
-def _encode(image, box, quality):
+def _fit(image, box):
+    """Une copie de l'image ramenée dans `box`, ratio conservé."""
     resized = image.copy()
     resized.thumbnail(box, PILImage.LANCZOS)
+    return resized
+
+
+def _encode(image, quality):
     buffer = io.BytesIO()
     # `save` on a fresh image drops EXIF, ICC and every other chunk.
-    resized.save(buffer, format=IMAGE_FORMAT, quality=quality, optimize=True, progressive=True)
-    return ContentFile(buffer.getvalue()), resized.size
+    image.save(buffer, format=IMAGE_FORMAT, quality=quality, optimize=True, progressive=True)
+    return ContentFile(buffer.getvalue()), image.size
 
 
 def render_image(file_or_bytes):
@@ -76,9 +103,19 @@ def render_image(file_or_bytes):
     Raises `UnprocessableImage` when the bytes are not a readable image.
     """
     image = _open(file_or_bytes)
-    master, master_size = _encode(image, MASTER_SIZE, MASTER_QUALITY)
-    display, display_size = _encode(image, DISPLAY_SIZE, DISPLAY_QUALITY)
-    thumbnail, thumbnail_size = _encode(image, THUMBNAIL_SIZE, THUMBNAIL_QUALITY)
+
+    # Les variantes descendent en cascade : la vignette est tirée de
+    # l'affichage, l'affichage du master. Les tirer chacune de l'original
+    # faisait trois copies pleine taille — 36 Mo pièce pour une photo de
+    # 12 Mpx — pour un résultat que l'œil ne distingue pas d'une réduction
+    # depuis 1600 px.
+    master_image = _fit(image, MASTER_SIZE)
+    display_image = _fit(master_image, DISPLAY_SIZE)
+    thumbnail_image = _fit(display_image, THUMBNAIL_SIZE)
+
+    master, master_size = _encode(master_image, MASTER_QUALITY)
+    display, display_size = _encode(display_image, DISPLAY_QUALITY)
+    thumbnail, thumbnail_size = _encode(thumbnail_image, THUMBNAIL_QUALITY)
     # Sizes are per rendition: callers store one of them, and the dimensions
     # they record must describe the file they actually stored — otherwise the
     # interface reserves the wrong space and every image jumps on load.
@@ -96,6 +133,6 @@ def render_image(file_or_bytes):
 
 def render_thumbnail(file_or_bytes):
     """Just the thumbnail — for posters, which need no other size."""
-    image = _open(file_or_bytes)
-    thumbnail, (width, height) = _encode(image, THUMBNAIL_SIZE, THUMBNAIL_QUALITY)
+    image = _open(file_or_bytes, THUMBNAIL_SIZE)
+    thumbnail, (width, height) = _encode(_fit(image, THUMBNAIL_SIZE), THUMBNAIL_QUALITY)
     return {"thumbnail": thumbnail, "width": width, "height": height}
