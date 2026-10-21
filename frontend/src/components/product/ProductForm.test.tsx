@@ -252,6 +252,24 @@ describe("ProductForm — envoi des photos", () => {
     expect(alert).toHaveTextContent("2 photo(s)");
   });
 
+  it("nomme le champ fautif au lieu de répéter une phrase anonyme", async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path.includes("/categories/")) return Promise.resolve(CATEGORIES);
+      return Promise.reject(
+        new FakeApiError(400, {
+          latitude: ["Assurez-vous qu'il n'y a pas plus de 9 chiffres au total."],
+          longitude: ["Assurez-vous qu'il n'y a pas plus de 9 chiffres au total."],
+        })
+      );
+    });
+
+    await fillAndSubmit([photoFile("a.jpg")]);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Latitude :");
+    expect(alert).toHaveTextContent("Longitude :");
+  });
+
   it("n'annonce aucune réduction quand la photo est déjà légère", async () => {
     // `prepareImage` renvoie le fichier d'origine quand le réencodage ne
     // gagne rien : « 123 Ko réduits à 123 Ko » n'aurait aucun sens.

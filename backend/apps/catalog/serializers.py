@@ -1,3 +1,5 @@
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -164,6 +166,49 @@ class ProductDetailSerializer(ProductListSerializer):
         return obj.public_longitude
 
 
+class CoordinateField(serializers.DecimalField):
+    """Une coordonnée GPS : arrondie d'abord, validée ensuite.
+
+    `navigator.geolocation` renvoie un flottant du navigateur, soit une
+    quinzaine de décimales : `12.371428299999999`. Le modèle en accepte
+    six, et DRF vérifie la précision **avant** d'arrondir — l'annonce était
+    donc refusée avec « Assurez-vous qu'il n'y a pas plus de 9 chiffres au
+    total », deux fois, une par coordonnée. Un vendeur qui autorisait la
+    géolocalisation ne pouvait plus publier, et le message ne disait pas de
+    quel champ il parlait.
+
+    La sixième décimale vaut environ onze centimètres : arrondir ne perd
+    rien d'utile, et refuser était absurde. On arrondit donc, puis on
+    valide — y compris l'étendue géographique, parce que la valeur vient du
+    navigateur et qu'une latitude de 500 n'existe pas.
+    """
+
+    QUANTUM = Decimal("0.000001")
+
+    def __init__(self, *, limit, **kwargs):
+        self.limit = Decimal(limit)
+        kwargs.setdefault("max_digits", 9)
+        kwargs.setdefault("decimal_places", 6)
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("allow_null", True)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if data is None or data == "":
+            return None
+        try:
+            value = Decimal(str(data))
+        except (InvalidOperation, TypeError, ValueError):
+            self.fail("invalid")
+        if not value.is_finite():
+            self.fail("invalid")
+        if abs(value) > self.limit:
+            raise serializers.ValidationError(
+                f"Coordonnée hors limites : attendue entre -{self.limit} et {self.limit}."
+            )
+        return super().to_internal_value(value.quantize(self.QUANTUM, rounding=ROUND_HALF_UP))
+
+
 class ProductWriteSerializer(serializers.ModelSerializer):
     """Create/update payload — ownership + moderation state are set server-side.
 
@@ -174,6 +219,8 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     """
 
     attributes = serializers.DictField(required=False, write_only=True)
+    latitude = CoordinateField(limit="90")
+    longitude = CoordinateField(limit="180")
 
     class Meta:
         model = Product

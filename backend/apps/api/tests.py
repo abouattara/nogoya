@@ -354,3 +354,70 @@ class CatalogApiTests(APITestCase):
         self.client.get(reverse("api:product-detail", args=[product.slug]))
         product.refresh_from_db()
         self.assertEqual(product.views_count, 0)
+
+
+class CoordinatePrecisionTests(APITestCase):
+    """Ce que le navigateur envoie réellement doit être accepté.
+
+    `navigator.geolocation` renvoie un flottant à quinze décimales. Le
+    modèle en garde six. DRF vérifiant la précision avant d'arrondir, une
+    annonce géolocalisée était refusée — et le message ne nommait même pas
+    le champ fautif.
+    """
+
+    def setUp(self):
+        self.category = Category.objects.create(name="Tentes")
+        self.user = User.objects.create_user(
+            phone="+22670060001", password="pw", role=User.Role.SUPPLIER
+        )
+        self.client.force_authenticate(self.user)
+
+    def _payload(self, **overrides):
+        return {
+            "title": "Tente de réception",
+            "category": self.category.pk,
+            "description": "Une tente spacieuse pour vos événements.",
+            "price": 25000,
+            "currency": "XOF",
+            "listing_type": "rent",
+            "rental_period": "day",
+            "city": "Ouagadougou",
+            "location_precision": "exact",
+            **overrides,
+        }
+
+    def test_browser_precision_coordinates_are_rounded_not_rejected(self):
+        resp = self.client.post(
+            reverse("api:product-list"),
+            self._payload(latitude="12.371428299999999", longitude="-1.5196603000000002"),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+
+        product = Product.objects.get(slug=resp.data["slug"])
+        self.assertEqual(str(product.latitude), "12.371428")
+        self.assertEqual(str(product.longitude), "-1.519660")
+
+    def test_a_coordinate_outside_the_globe_is_still_refused(self):
+        """Arrondir n'est pas tout accepter : la donnée vient du navigateur."""
+        resp = self.client.post(
+            reverse("api:product-list"),
+            self._payload(latitude="500", longitude="0"),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("hors limites", str(resp.data["latitude"][0]))
+
+    def test_an_unparseable_coordinate_is_refused(self):
+        resp = self.client.post(
+            reverse("api:product-list"),
+            self._payload(latitude="douze virgule trois", longitude="0"),
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("latitude", resp.data)
+
+    def test_no_coordinates_remains_valid(self):
+        resp = self.client.post(reverse("api:product-list"), self._payload(), format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertIsNone(Product.objects.get(slug=resp.data["slug"]).latitude)

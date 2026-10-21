@@ -87,19 +87,53 @@ function PhotoSummary({ photos }: { photos: NewPhoto[] }) {
   );
 }
 
+/**
+ * Les libellés des champs, pour que l'erreur dise de quoi elle parle.
+ *
+ * L'API répond `{"latitude": ["..."], "longitude": ["..."]}` ; aplatir les
+ * valeurs donnait deux fois la même phrase sans jamais nommer le champ —
+ * le vendeur lisait « Assurez-vous qu'il n'y a pas plus de 9 chiffres au
+ * total » deux fois de suite, sans savoir où regarder.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  title: "Titre",
+  category: "Catégorie",
+  description: "Description",
+  price: "Prix",
+  currency: "Devise",
+  listing_type: "Type d'offre",
+  rental_period: "Période de location",
+  city: "Ville",
+  location: "Quartier",
+  region: "Région",
+  country: "Pays",
+  latitude: "Latitude",
+  longitude: "Longitude",
+  location_precision: "Visibilité de la position",
+  images: "Photos",
+};
+
+function formatFieldErrors(body: Record<string, unknown> | null): string {
+  if (!body) return "";
+  return Object.entries(body)
+    .map(([field, value]) => {
+      const text = (Array.isArray(value) ? value : [value]).map((m) => String(m)).join(" ");
+      const label = FIELD_LABELS[field];
+      // `detail` et `non_field_errors` ne désignent aucun champ : les
+      // préfixer d'un nom inventé serait trompeur.
+      return label ? `${label} : ${text}` : text;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** Ce qu'on peut dire d'un échec, en une poignée de mots. */
 function describeFailure(cause: unknown): string {
   if (!(cause instanceof ApiError)) return "connexion interrompue";
   const body = cause.body as Record<string, unknown> | null;
-  const messages = body
-    ? Object.values(body)
-        .flat()
-        .map((m) => String(m))
-        .join(" ")
-    : "";
   // Sans corps JSON exploitable, la réponse vient d'un intermédiaire
   // (proxy, pare-feu applicatif) : le code est alors la seule information.
-  return messages || `erreur ${cause.status}`;
+  return formatFieldErrors(body) || `erreur ${cause.status}`;
 }
 
 /**
@@ -255,8 +289,12 @@ export function ProductForm({ mode, product }: ProductFormProps) {
     setGeoStatus("locating");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setValue("latitude", String(pos.coords.latitude));
-        setValue("longitude", String(pos.coords.longitude));
+        // Six décimales, pas quinze. `pos.coords.latitude` est un flottant
+        // du navigateur : `12.371428299999999`. Le serveur n'en garde que
+        // six — onze centimètres — et les chiffres suivants ne sont que du
+        // bruit de représentation.
+        setValue("latitude", pos.coords.latitude.toFixed(6));
+        setValue("longitude", pos.coords.longitude.toFixed(6));
         setGeoStatus("done");
       },
       () => setGeoStatus("denied"),
@@ -358,16 +396,12 @@ export function ProductForm({ mode, product }: ProductFormProps) {
           setServerError("Vérifiez les caractéristiques de l'annonce.");
           return;
         }
-        const messages = body
-          ? Object.values(body)
-              .flat()
-              .map((m) => String(m))
-              .join(" ")
-          : "";
         // Sans corps JSON exploitable, l'erreur vient d'un intermédiaire
         // (proxy, pare-feu applicatif) et non de l'API : afficher le code
         // évite un message opaque impossible à diagnostiquer.
-        setServerError(messages || `Enregistrement impossible (erreur ${err.status}).`);
+        setServerError(
+          formatFieldErrors(body) || `Enregistrement impossible (erreur ${err.status}).`
+        );
       } else {
         setServerError("Enregistrement impossible pour le moment.");
       }
