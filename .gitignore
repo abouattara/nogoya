@@ -17,6 +17,7 @@ frontend/node_modules/
 backend/.venv/
 backend/media/
 backend/staticfiles/
+backend/logs/
 # Exports deposes par les partenaires : leurs donnees, pas les notres.
 backend/imports/*
 !backend/imports/.gitkeep

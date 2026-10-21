@@ -26,6 +26,7 @@ from .serializers import (
     ProductListSerializer,
     ProductWriteSerializer,
 )
+from .services import compress_product_image
 from .tasks import compress_product_image_task
 from apps.media.validators import validate_image_upload
 
@@ -58,6 +59,47 @@ def _storage_failure_reason(exc):
     # « DataError » oriente immédiatement le diagnostic sans rien révéler
     # des chemins, des requêtes ou de la configuration.
     return f"le serveur n'a pas pu enregistrer ce fichier ({type(exc).__name__})"
+
+
+def _schedule_compression(image):
+    """Demander le traitement d'une image, sans jamais faire échouer l'envoi.
+
+    Les octets sont déjà sur le disque et la ligne est en base : à partir
+    de là, plus rien ne justifie de répondre une erreur au vendeur.
+
+    `delay()` n'est pas anodin. Hors du mode « eager », elle écrit dans un
+    courtier — Redis — qui n'existe pas sur un hébergement mutualisé : la
+    connexion est refusée **après** l'enregistrement, et l'envoi ressortait
+    en 500 alors que la photo était bien là. C'est exactement le symptôme
+    observé en production : les trois photos visibles à la modification,
+    et trois erreurs 500 à la publication.
+
+    En repli, on compresse sur place : c'est de toute façon ce que le mode
+    « eager » aurait fait.
+    """
+    try:
+        compress_product_image_task.delay(image.pk)
+        return
+    except Exception:
+        logger.exception(
+            "Impossible de confier l'image %s au worker ; traitement sur place.", image.pk
+        )
+
+    try:
+        compress_product_image(image)
+    except Exception:
+        # Une vignette ratée laisse l'original affichable : l'annonce vaut
+        # mieux que son optimisation.
+        logger.exception("Compression sur place échouée pour l'image %s", image.pk)
+
+
+def _serialize(images, request):
+    """Le rendu de la réponse ne doit pas perdre un travail déjà accompli."""
+    try:
+        return ProductImageSerializer(images, many=True, context={"request": request}).data
+    except Exception:
+        logger.exception("Sérialisation des images impossible ; repli sur les identifiants.")
+        return [{"id": image.pk, "order": image.order, "is_cover": image.is_cover} for image in images]
 
 
 def _is_owner(user, product):
@@ -234,14 +276,13 @@ class ProductViewSet(viewsets.ModelViewSet):
                 logger.exception("Échec d'enregistrement d'une image pour %s", product.slug)
                 failures.append(f"{f.name} : {_storage_failure_reason(exc)}")
                 continue
-            compress_product_image_task.delay(image.pk)
+            _schedule_compression(image)
             created.append(image)
 
         if failures and not created:
             return Response({"images": failures}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-        serializer = ProductImageSerializer(created, many=True, context={"request": request})
-        payload = serializer.data
+        payload = _serialize(created, request)
         if failures:
             # Réussite partielle : on rend ce qui est passé, et l'on nomme
             # ce qui ne l'est pas. Taire l'échec laisserait le vendeur

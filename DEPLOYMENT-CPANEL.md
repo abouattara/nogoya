@@ -504,6 +504,20 @@ le fichier envoyé, ou un intermédiaire devant Django.
 `os.access` seul ne suffit pas : il ment sur certains montages et ne dit
 rien d'un quota. D'où l'écriture réelle.
 
+### Lire les erreurs de l'application
+
+Django écrit sur la console, et Passenger redirige cette sortie vers un
+emplacement qui change d'un hébergeur à l'autre — chercher une trace
+d'erreur coûtait une demi-heure. Le profil cPanel écrit donc aussi dans un
+fichier dont l'emplacement est fixe :
+
+```bash
+tail -n 100 ~/nogoya/backend/logs/app.log
+```
+
+Rotation à 5 Mo sur trois fichiers : sur un mutualisé, le quota compte
+autant les octets que le nombre de fichiers.
+
 Si `/readyz/` renvoie `cache: error`, c'est que `createcachetable` n'a pas
 été exécuté.
 

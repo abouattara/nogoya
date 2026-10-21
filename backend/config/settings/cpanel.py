@@ -88,6 +88,32 @@ CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = False  # une vignette ratée ne casse pas l'upload
 
 # ---------------------------------------------------------------------------
+# Journaux : un fichier qu'on sait où trouver
+# ---------------------------------------------------------------------------
+# Django écrit sur la console, et Passenger redirige cette sortie vers un
+# emplacement qui varie d'un hébergeur à l'autre — on a perdu des heures à
+# chercher une trace d'erreur. Ici, elle est toujours au même endroit :
+#
+#     tail -n 100 ~/nogoya/backend/logs/app.log
+#
+# Rotation à 5 Mo sur trois fichiers : le quota d'un mutualisé compte
+# autant les octets que les inodes.
+import os  # noqa: E402
+
+LOG_DIR = BASE_DIR / "logs"  # noqa: F405
+os.makedirs(LOG_DIR, exist_ok=True)
+
+LOGGING["handlers"]["file"] = {  # noqa: F405
+    "class": "logging.handlers.RotatingFileHandler",
+    "filename": str(LOG_DIR / "app.log"),
+    "maxBytes": 5 * 1024 * 1024,
+    "backupCount": 3,
+    "formatter": "verbose",
+}
+for _logger in (LOGGING["root"], *LOGGING["loggers"].values()):  # noqa: F405
+    _logger["handlers"] = [*_logger["handlers"], "file"]
+
+# ---------------------------------------------------------------------------
 # Redirection HTTPS
 # ---------------------------------------------------------------------------
 # cPanel termine le TLS en amont et transmet X-Forwarded-Proto ; la

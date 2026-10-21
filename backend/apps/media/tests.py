@@ -225,6 +225,38 @@ class StorageFailureTests(APITestCase):
         self.assertIn("DataError", response.data["images"][0])
         self.assertNotIn("colonne trop courte", str(response.data))
 
+    def test_an_unreachable_broker_does_not_fail_an_upload_already_written(self):
+        """Le symptôme vu en production : photo bien enregistrée, réponse 500.
+
+        Hors mode « eager », `delay()` écrit dans un courtier absent du
+        mutualisé. L'échec survenait APRÈS l'écriture du fichier : les
+        photos apparaissaient à la modification de l'annonce, et la
+        publication affichait trois erreurs 500.
+        """
+        refus = ConnectionError("Error 111 connecting to 127.0.0.1:6379. Connection refused.")
+        with patch("apps.catalog.api.compress_product_image_task.delay", side_effect=refus):
+            response = self._upload()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(self.product.images.count(), 1)
+
+    def test_the_fallback_still_compresses_when_the_broker_is_down(self):
+        refus = ConnectionError("Connection refused")
+        with patch("apps.catalog.api.compress_product_image_task.delay", side_effect=refus):
+            self._upload()
+
+        image = self.product.images.get()
+        # Le repli synchrone a bien produit les variantes.
+        self.assertTrue(image.master)
+        self.assertGreater(image.width, 0)
+
+    def test_a_failure_to_serialize_does_not_lose_the_upload(self):
+        with patch("apps.catalog.api.ProductImageSerializer", side_effect=RuntimeError("boum")):
+            response = self._upload()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data[0]["id"], self.product.images.get().pk)
+
     def test_one_bad_file_does_not_cost_the_others(self):
         """Réussite partielle : ce qui est passé est rendu, le reste est nommé."""
         calls = {"n": 0}
