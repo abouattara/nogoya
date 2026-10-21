@@ -315,11 +315,28 @@ npm run deploy:pack
 | Piège | Ce que fait le script |
 |---|---|
 | `.next/static` et `public` ne sont pas copiés par Next | il les ajoute — sans eux, le site s'affiche **sans aucun style** |
-| Le binaire natif de `sharp` correspond à la machine du build | il retire les variantes d'autres plateformes. Un build Windows embarque `@img/sharp-win32-x64`, inutilisable sous Linux : `/_next/image` renverrait 500 et **plus aucune photo ne s'afficherait** |
-| La `package.json` recopiée liste *toutes* les dépendances | il la remplace par le strict nécessaire. Sinon un `npm install` sur le serveur — ou le bouton « Run NPM Install » — téléchargerait Playwright, Vitest et le reste : plus de 500 Mo |
+| Le binaire natif de `sharp` correspond à la machine du build | il retire les variantes d'autres plateformes — un build Windows embarque `@img/sharp-win32-x64`, inutilisable sous Linux — **et télécharge celle de la cible** avec `npm pack`, qui ignore la plateforme de l'hôte là où `npm install` ne retient que la sienne |
+| La `package.json` recopiée liste *toutes* les dépendances | il la remplace par une version **sans aucune dépendance** : le bundle est complet, il n'y a rien à installer sur le serveur |
 
-Le dossier obtenu pèse **29 Mo** (1 523 fichiers), contre 504 Mo pour un
+Le dossier obtenu pèse **38 Mo** (1 842 fichiers), contre 504 Mo pour un
 `node_modules` complet.
+
+> ### ⚠ Jamais de `npm install` sur le serveur
+>
+> La `package.json` du bundle ne déclare aucune dépendance, et c'est
+> délibéré. Une version antérieure y déclarait `sharp`, et cette
+> documentation finissait par `npm install`. npm jugeait alors `next`,
+> `react` et `react-dom` — présents dans `node_modules` mais absents des
+> dépendances déclarées — **superflus, et les supprimait**. L'application ne
+> démarrait plus et **tout le site répondait 503**, fichiers statiques
+> compris.
+>
+> Reproduit et mesuré : 11 paquets dans `node_modules` avant la commande,
+> 7 après. Le bouton « Run NPM Install » de *Setup Node.js App* a le même
+> effet : ne le touchez pas.
+>
+> Si une dépendance venait à manquer à l'exécution, c'est `pack-deploy.mjs`
+> qu'il faut corriger, pas un `npm install` qu'il faut ajouter.
 
 **Empaquetez en `.tar.gz`, jamais en `.zip` depuis Windows :**
 
@@ -348,14 +365,8 @@ cd ~/nogoya-node
 tar xzf nogoya-frontend.tar.gz && rm nogoya-frontend.tar.gz
 ```
 
-Puis :
-
-```bash
-cd ~/nogoya-node
-npm install        # récupère le binaire Linux de sharp, quelques Mo
-```
-
-Enfin **Restart** dans *Setup Node.js App*.
+Puis **Restart** dans *Setup Node.js App*. Rien d'autre : pas de
+`npm install`, pas de « Run NPM Install » (voir l'encadré plus haut).
 
 L'arborescence finale doit être :
 
@@ -416,9 +427,10 @@ Un arrêt brutal pendant `npm run build` (« Killed », ou plus aucun message)
 signifie que la limite mémoire est atteinte : repassez à la construction
 locale.
 
-> Construire sur le serveur a un avantage : le binaire natif de `sharp` est
-> alors celui de Linux, et le `npm install` de l'étape précédente devient
-> inutile.
+> Construire sur le serveur n'a plus d'avantage décisif : `pack-deploy.mjs`
+> télécharge désormais le binaire Linux de `sharp` depuis la machine de
+> développement. Cette voie reste documentée pour le cas où l'empaquetage
+> local poserait problème.
 
 ## 8. Entretien
 
