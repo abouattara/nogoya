@@ -244,10 +244,30 @@ describe("ProductForm — envoi des photos", () => {
     await fillAndSubmit([photoFile("a.jpg"), photoFile("b.jpg"), photoFile("c.jpg")]);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("photo 2 sur 3");
     expect(alert).toHaveTextContent("erreur 503");
     expect(alert).toHaveTextContent(/annonce a bien été enregistrée/i);
-    // La troisième n'est pas tentée : inutile d'insister si le serveur peine.
-    expect(uploadCalls()).toHaveLength(2);
+    // Les trois sont tentées : une photo refusée ne doit pas priver
+    // l'annonce des deux autres, qui partaient très bien.
+    expect(uploadCalls()).toHaveLength(3);
+    expect(alert).toHaveTextContent("2 photo(s)");
+  });
+
+  it("n'annonce aucune réduction quand la photo est déjà légère", async () => {
+    // `prepareImage` renvoie le fichier d'origine quand le réencodage ne
+    // gagne rien : « 123 Ko réduits à 123 Ko » n'aurait aucun sens.
+    prepareImage.mockImplementation(async (file: File) => ({
+      file,
+      width: 400,
+      height: 300,
+      previewUrl: `blob:${file.name}`,
+      originalSize: file.size,
+    }));
+    renderWithProviders(<ProductForm mode="create" />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, [photoFile("a.jpg")]);
+
+    await waitFor(() => expect(screen.getByText(/1 photo —/)).toBeInTheDocument());
+    expect(screen.getByText(/à envoyer\./)).toBeInTheDocument();
+    expect(screen.queryByText(/réduits à/)).not.toBeInTheDocument();
   });
 });

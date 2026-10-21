@@ -1,5 +1,8 @@
+import errno
+import logging
+
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import models
+from django.db import models, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
@@ -25,6 +28,36 @@ from .serializers import (
 )
 from .tasks import compress_product_image_task
 from apps.media.validators import validate_image_upload
+
+
+logger = logging.getLogger("nogoya.catalog")
+
+
+def _storage_failure_reason(exc):
+    """Une phrase utile à l'exploitant, sans détailler l'infrastructure.
+
+    Le numéro d'erreur système dit l'essentiel : la distinction entre un
+    disque plein et un dossier non inscriptible décide de ce qu'il faut
+    aller corriger. Le message brut du système, lui, reste dans les
+    journaux.
+    """
+    if isinstance(exc, OSError):
+        reasons = {
+            errno.ENOSPC: "espace disque insuffisant sur le serveur",
+            errno.EDQUOT: "quota disque du compte atteint",
+            errno.EACCES: "dossier des médias non inscriptible",
+            errno.EPERM: "dossier des médias non inscriptible",
+            errno.EROFS: "dossier des médias en lecture seule",
+            errno.EMFILE: "trop de fichiers ouverts sur le serveur",
+        }
+        known = reasons.get(exc.errno)
+        if known:
+            return known
+        return f"erreur système à l'enregistrement (code {exc.errno})"
+    # Le nom de la classe, pas le message : « OperationalError » ou
+    # « DataError » oriente immédiatement le diagnostic sans rien révéler
+    # des chemins, des requêtes ou de la configuration.
+    return f"le serveur n'a pas pu enregistrer ce fichier ({type(exc).__name__})"
 
 
 def _is_owner(user, product):
@@ -170,21 +203,54 @@ class ProductViewSet(viewsets.ModelViewSet):
         has_cover = product.images.filter(is_cover=True).exists()
         start_order = product.images.count()
         created = []
+        failures = []
         for idx, f in enumerate(files):
-            image = ProductImage.objects.create(
-                product=product,
-                image=f,
-                # `master` is written by the compression step, from an
-                # optimised rendition rather than the raw upload: a later
-                # crop starts from 1600px, not from 12 MB of phone photo.
-                order=start_order + idx,
-                is_cover=not has_cover and idx == 0,
-            )
+            try:
+                # Un point de sauvegarde par photo. Sans lui, attraper
+                # l'exception laisse la transaction courante inutilisable et
+                # la photo suivante échoue à son tour sur un
+                # « TransactionManagementError » qui n'a plus rien à voir
+                # avec elle. Le `atomic` imbriqué pose un SAVEPOINT et le
+                # défait proprement.
+                with transaction.atomic():
+                    image = ProductImage.objects.create(
+                        product=product,
+                        image=f,
+                        # `master` is written by the compression step, from an
+                        # optimised rendition rather than the raw upload: a
+                        # later crop starts from 1600px, not from 12 MB of
+                        # phone photo.
+                        order=start_order + idx,
+                        is_cover=not has_cover and idx == 0,
+                    )
+            except Exception as exc:
+                # Écrire des octets sur un disque peut échouer pour des
+                # raisons qui n'ont rien à voir avec le fichier envoyé :
+                # disque plein, quota atteint, dossier média non
+                # inscriptible. Une exception nue donnait un 500 dont la
+                # réponse n'était pas du JSON — le visiteur voyait un
+                # message vide et les journaux de l'application étaient le
+                # seul endroit où lire la cause.
+                logger.exception("Échec d'enregistrement d'une image pour %s", product.slug)
+                failures.append(f"{f.name} : {_storage_failure_reason(exc)}")
+                continue
             compress_product_image_task.delay(image.pk)
             created.append(image)
 
+        if failures and not created:
+            return Response({"images": failures}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
         serializer = ProductImageSerializer(created, many=True, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        payload = serializer.data
+        if failures:
+            # Réussite partielle : on rend ce qui est passé, et l'on nomme
+            # ce qui ne l'est pas. Taire l'échec laisserait le vendeur
+            # croire sa galerie complète.
+            return Response(
+                {"images": payload, "failed": failures},
+                status=status.HTTP_207_MULTI_STATUS,
+            )
+        return Response(payload, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def contact(self, request, slug=None):

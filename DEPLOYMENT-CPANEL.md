@@ -486,6 +486,24 @@ Dans cet ordre, en s'arrêtant à la première qui échoue :
 | Une image d'annonce | s'affiche (sinon : § 5) |
 | Envoi d'un message avec photo | la vignette apparaît dans la conversation |
 
+### Quand l'envoi d'une photo échoue
+
+Le message affiché nomme désormais la cause : « espace disque insuffisant »,
+« dossier des médias non inscriptible », ou le type d'erreur rencontré.
+Pour trancher en une commande, sans lire les journaux :
+
+```bash
+source ~/virtualenv/nogoya/backend/3.11/bin/activate && cd ~/nogoya/backend && python manage.py check_media
+```
+
+Elle écrit réellement un fichier par le stockage configuré, le relit et le
+supprime, puis affiche `MEDIA_ROOT`, l'espace libre et le diagnostic. Si
+elle réussit, le stockage n'est pas en cause et il faut chercher ailleurs —
+le fichier envoyé, ou un intermédiaire devant Django.
+
+`os.access` seul ne suffit pas : il ment sur certains montages et ne dit
+rien d'un quota. D'où l'écriture réelle.
+
 Si `/readyz/` renvoie `cache: error`, c'est que `createcachetable` n'a pas
 été exécuté.
 

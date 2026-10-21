@@ -78,7 +78,14 @@ def _open(file_or_bytes, target=MASTER_SIZE):
     # Applies the EXIF orientation flag to the pixels and returns a copy
     # without it, so the image can no longer be rotated twice.
     image = ImageOps.exif_transpose(image)
-    if image.mode in ("RGBA", "P", "LA"):
+
+    # Le JPEG ne sait écrire que trois modes. Convertir une liste choisie de
+    # modes laissait passer les autres — un PNG 16 bits (`I;16`), qu'un
+    # scanner ou un éditeur produit sans prévenir, traversait toute la
+    # validation puis mourait à l'encodage sur « cannot write mode I;16 as
+    # JPEG », côté serveur, en 500. On inverse donc la règle : tout ce qui
+    # n'est pas directement écrivable est converti.
+    if image.mode not in ("RGB", "L", "CMYK"):
         image = image.convert("RGB")
     return image
 
@@ -92,8 +99,14 @@ def _fit(image, box):
 
 def _encode(image, quality):
     buffer = io.BytesIO()
-    # `save` on a fresh image drops EXIF, ICC and every other chunk.
-    image.save(buffer, format=IMAGE_FORMAT, quality=quality, optimize=True, progressive=True)
+    try:
+        # `save` on a fresh image drops EXIF, ICC and every other chunk.
+        image.save(buffer, format=IMAGE_FORMAT, quality=quality, optimize=True, progressive=True)
+    except (OSError, ValueError) as exc:
+        # Un mode ou un profil que le JPEG refuse : c'est une image qu'on ne
+        # sait pas traiter, pas une panne du serveur. L'appelant la refusera
+        # proprement au lieu de renvoyer 500.
+        raise UnprocessableImage(f"Encodage JPEG impossible ({image.mode}) : {exc}") from exc
     return ContentFile(buffer.getvalue()), image.size
 
 

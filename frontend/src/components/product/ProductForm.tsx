@@ -66,30 +66,40 @@ interface ProductFormProps {
   product?: ProductDetail; // required for edit
 }
 
-/** Échec sur une photo précise, l'annonce étant déjà enregistrée. */
-class PhotoUploadError extends Error {
-  constructor(
-    readonly index: number,
-    readonly total: number,
-    readonly cause: unknown
-  ) {
-    super(`photo ${index}/${total}`);
-  }
+/**
+ * Le poids de ce qui va partir.
+ *
+ * On ne parle de réduction que lorsqu'il y en a une : une photo déjà
+ * légère est renvoyée telle quelle par `prepareImage`, et annoncer
+ * « 123 Ko réduits à 123 Ko » donnait l'impression d'un calcul raté.
+ */
+function PhotoSummary({ photos }: { photos: NewPhoto[] }) {
+  const before = photos.reduce((total, photo) => total + photo.originalSize, 0);
+  const after = photos.reduce((total, photo) => total + photo.file.size, 0);
+  const label = `${photos.length} photo${photos.length > 1 ? "s" : ""}`;
 
-  /** Ce qu'on peut dire de la cause, en une poignée de mots. */
-  reason(): string {
-    if (!(this.cause instanceof ApiError)) return "connexion interrompue";
-    const body = this.cause.body as Record<string, unknown> | null;
-    const messages = body
-      ? Object.values(body)
-          .flat()
-          .map((m) => String(m))
-          .join(" ")
-      : "";
-    // Sans corps JSON exploitable, la réponse vient d'un intermédiaire
-    // (proxy, pare-feu applicatif) : le code est alors la seule information.
-    return messages || `erreur ${this.cause.status}`;
-  }
+  return (
+    <p className="mt-2 text-xs text-foreground-muted">
+      {after < before
+        ? `${label} — ${formatBytes(before)} réduits à ${formatBytes(after)} avant envoi.`
+        : `${label} — ${formatBytes(after)} à envoyer.`}
+    </p>
+  );
+}
+
+/** Ce qu'on peut dire d'un échec, en une poignée de mots. */
+function describeFailure(cause: unknown): string {
+  if (!(cause instanceof ApiError)) return "connexion interrompue";
+  const body = cause.body as Record<string, unknown> | null;
+  const messages = body
+    ? Object.values(body)
+        .flat()
+        .map((m) => String(m))
+        .join(" ")
+    : "";
+  // Sans corps JSON exploitable, la réponse vient d'un intermédiaire
+  // (proxy, pare-feu applicatif) : le code est alors la seule information.
+  return messages || `erreur ${cause.status}`;
 }
 
 /**
@@ -289,6 +299,7 @@ export function ProductForm({ mode, product }: ProductFormProps) {
       // worker se fait tuer — l'annonce était créée, mais sans aucune photo.
       // Séparées, chacune est une requête courte, et un échec n'emporte plus
       // que la photo concernée.
+      const failed: string[] = [];
       for (const [index, photo] of images.entries()) {
         setUploadStatus(`Envoi de la photo ${index + 1} sur ${images.length}…`);
         const formData = new FormData();
@@ -299,10 +310,26 @@ export function ProductForm({ mode, product }: ProductFormProps) {
             body: formData,
           });
         } catch (err) {
-          throw new PhotoUploadError(index + 1, images.length, err);
+          // On continue : une photo refusée ne doit pas priver l'annonce
+          // des suivantes. S'arrêter à la première laissait une galerie
+          // vide alors que deux photos sur trois étaient parfaitement
+          // envoyables.
+          failed.push(`${index + 1} (${describeFailure(err)})`);
         }
       }
       setUploadStatus(null);
+
+      if (failed.length) {
+        await queryClient.invalidateQueries({ queryKey: ["my-products"] });
+        const quelles = failed.length === 1 ? "la photo" : "les photos";
+        setServerError(
+          `L'annonce a bien été enregistrée${
+            failed.length < images.length ? ` avec ${images.length - failed.length} photo(s)` : ""
+          }, mais ${quelles} ${failed.join(", ")} n'a pas pu être envoyée. ` +
+            `Ouvrez l'annonce depuis « Mes annonces » pour réessayer.`
+        );
+        return;
+      }
 
       // The dashboard lists are cached for 30s; without this the supplier
       // lands back on a table still showing what they just changed.
@@ -314,16 +341,6 @@ export function ProductForm({ mode, product }: ProductFormProps) {
       router.push("/compte/fournisseur");
     } catch (err) {
       setUploadStatus(null);
-      // À ce stade l'annonce existe déjà : le dire, plutôt que laisser
-      // croire que rien n'a été enregistré et provoquer un doublon — c'est
-      // ainsi que des annonces sans photo s'accumulaient.
-      if (err instanceof PhotoUploadError) {
-        setServerError(
-          `L'annonce a bien été enregistrée, mais l'envoi de la photo ${err.index} sur ${err.total} ` +
-            `a échoué (${err.reason()}). Ouvrez-la depuis « Mes annonces » pour ajouter les photos manquantes.`
-        );
-        return;
-      }
       if (err instanceof ApiError) {
         const body = err.body as Record<string, unknown> | null;
         // The API reports attribute problems as {attributes: {slug: msg}} —
@@ -496,13 +513,7 @@ export function ProductForm({ mode, product }: ProductFormProps) {
             ))}
           </div>
         )}
-        {images.length > 0 && (
-          <p className="mt-2 text-xs text-foreground-muted">
-            {images.length} photo{images.length > 1 ? "s" : ""} —{" "}
-            {formatBytes(images.reduce((total, photo) => total + photo.originalSize, 0))} réduits à{" "}
-            {formatBytes(images.reduce((total, photo) => total + photo.file.size, 0))} avant envoi.
-          </p>
-        )}
+        {images.length > 0 && <PhotoSummary photos={images} />}
       </div>
 
       {editingNewIndex !== null && images[editingNewIndex] && (

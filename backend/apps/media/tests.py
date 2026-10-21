@@ -1,4 +1,5 @@
 """Media pipeline: processing, orphan cleanup, file deletion."""
+import errno
 import io
 import shutil
 import tempfile
@@ -13,6 +14,11 @@ from PIL import Image as PILImage
 
 from apps.catalog.models import Category, Product, ProductImage
 from apps.media.models import MessageAttachment
+from unittest.mock import patch
+from django.core.files.storage import Storage
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 from apps.media.processing import DISPLAY_SIZE, UnprocessableImage, render_image
 from apps.messaging.models import Message
 from apps.messaging.services import get_or_create_conversation
@@ -153,3 +159,104 @@ class OrphanCleanupTests(TestCase):
         key = default_storage.save("chat/999/999/in-flight.jpg", ContentFile(b"x"))
         call_command("prune_media", "--delete", verbosity=0)  # default retention
         self.assertTrue(default_storage.exists(key))
+
+
+class StorageFailureTests(APITestCase):
+    """Ce que voit le vendeur quand le serveur, lui, est en cause.
+
+    Disque plein, quota atteint, dossier média non inscriptible : rien de
+    tout cela n'est la faute du fichier envoyé, et rien ne doit sortir en
+    500 muet. Le message doit nommer la cause assez précisément pour que
+    l'exploitant sache quoi aller corriger.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            phone="+22670080001", password="pw", role=User.Role.SUPPLIER
+        )
+        category = Category.objects.create(name="Tentes")
+        self.product = Product.objects.create(
+            supplier=self.user.supplier_profile, category=category,
+            title="Tente", price=5000, city="Ouaga",
+        )
+        self.url = reverse("api:product-upload-images", args=[self.product.slug])
+        self.client.force_authenticate(self.user)
+
+    def _upload(self):
+        return self.client.post(
+            self.url,
+            {"images": SimpleUploadedFile("photo.jpg", jpeg_bytes(), content_type="image/jpeg")},
+            format="multipart",
+        )
+
+    def test_a_full_disk_is_reported_as_such_not_as_a_500(self):
+        full = OSError(errno.ENOSPC, "No space left on device")
+        with patch.object(Storage, "save", side_effect=full):
+            response = self._upload()
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("espace disque insuffisant", response.data["images"][0])
+        self.assertFalse(self.product.images.exists())
+
+    def test_an_unwritable_media_directory_says_so(self):
+        denied = OSError(errno.EACCES, "Permission denied")
+        with patch.object(Storage, "save", side_effect=denied):
+            response = self._upload()
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("non inscriptible", response.data["images"][0])
+
+    def test_the_system_message_itself_is_never_echoed_to_the_client(self):
+        """Le détail reste dans les journaux : la réponse dit la catégorie."""
+        leaky = OSError(errno.ENOSPC, "No space left on device: '/home/binogoya/media'")
+        with patch.object(Storage, "save", side_effect=leaky):
+            response = self._upload()
+
+        self.assertNotIn("/home/binogoya", str(response.data))
+
+    def test_a_non_system_failure_still_names_its_category(self):
+        """« OperationalError » oriente le diagnostic ; le message, non."""
+        from django.db import DataError
+
+        with patch.object(Storage, "save", side_effect=DataError("colonne trop courte")):
+            response = self._upload()
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("DataError", response.data["images"][0])
+        self.assertNotIn("colonne trop courte", str(response.data))
+
+    def test_one_bad_file_does_not_cost_the_others(self):
+        """Réussite partielle : ce qui est passé est rendu, le reste est nommé."""
+        calls = {"n": 0}
+        real_save = Storage.save
+
+        def flaky(self, name, content, max_length=None):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise OSError(errno.ENOSPC, "No space left on device")
+            return real_save(self, name, content, max_length)
+
+        with patch.object(Storage, "save", flaky):
+            response = self.client.post(
+                self.url,
+                {"images": [
+                    SimpleUploadedFile("a.jpg", jpeg_bytes(), content_type="image/jpeg"),
+                    SimpleUploadedFile("b.jpg", jpeg_bytes(), content_type="image/jpeg"),
+                ]},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_207_MULTI_STATUS)
+        self.assertEqual(len(response.data["images"]), 1)
+        self.assertIn("a.jpg", response.data["failed"][0])
+
+
+class UnwritableImageModeTests(TestCase):
+    """Un mode que le JPEG refuse est une image invalide, pas une panne."""
+
+    def test_a_16_bit_png_is_converted_instead_of_crashing(self):
+        buffer = io.BytesIO()
+        PILImage.new("I;16", (600, 400)).save(buffer, "PNG")
+
+        rendered = render_image(io.BytesIO(buffer.getvalue()))
+        self.assertEqual(rendered["master_size"], (600, 400))
