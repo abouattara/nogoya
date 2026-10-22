@@ -115,8 +115,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         # comme son vendeur. On nomme la source, qui est la vérité.
         if obj.is_externally_sourced:
             return obj.source.name if obj.source_id else "Source externe"
-        user = obj.supplier.user
-        return user.get_full_name() or user.phone
+        return obj.supplier.user.public_name("Annonceur")
 
     def get_is_favorite(self, obj):
         request = self.context.get("request")
@@ -207,6 +206,29 @@ class CoordinateField(serializers.DecimalField):
                 f"Coordonnée hors limites : attendue entre -{self.limit} et {self.limit}."
             )
         return super().to_internal_value(value.quantize(self.QUANTUM, rounding=ROUND_HALF_UP))
+
+
+class ModerationProductSerializer(ProductListSerializer):
+    """Ce qu'un modérateur doit voir pour décider — et rien de plus.
+
+    Toutes les photos, pas seulement la couverture : une annonce se refuse
+    souvent sur la deuxième image. La description entière, parce qu'un
+    extrait masque justement ce qu'on cherche. Et la provenance avec son
+    lien d'origine, pour vérifier une annonce référencée avant de la
+    publier.
+
+    Aucune coordonnée du fournisseur : modérer ne demande pas de savoir
+    qui joindre, et l'écran serait alors un annuaire.
+    """
+
+    images = ProductImageSerializer(many=True, read_only=True)
+    category_name = serializers.CharField(source="category.name", default="", read_only=True)
+
+    class Meta(ProductListSerializer.Meta):
+        fields = ProductListSerializer.Meta.fields + [
+            "description", "images", "location", "region", "country",
+            "category_name", "source_url", "last_checked_at", "published_at",
+        ]
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):

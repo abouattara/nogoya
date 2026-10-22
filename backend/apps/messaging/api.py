@@ -139,7 +139,7 @@ class ConversationViewSet(
 
     def _notify_recipient(self, conversation, message):
         recipient = conversation.other_participant(message.sender)
-        sender_name = message.sender.get_full_name() or message.sender.phone
+        sender_name = message.sender.public_name()
         preview = TYPE_PREVIEW.get(message.message_type) or message.body[:120] or "📎 Annonce jointe"
         notify(
             recipient,

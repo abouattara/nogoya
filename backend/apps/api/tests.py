@@ -11,7 +11,7 @@ from PIL import Image as PILImage
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.catalog.models import Category, Product
+from apps.catalog.models import Category, Product, ProductImage
 from apps.suppliers.models import SupplierProfile
 
 User = get_user_model()
@@ -421,3 +421,185 @@ class CoordinatePrecisionTests(APITestCase):
         resp = self.client.post(reverse("api:product-list"), self._payload(), format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         self.assertIsNone(Product.objects.get(slug=resp.data["slug"]).latitude)
+
+
+class ModerationEndpointTests(APITestCase):
+    """La file de modération : qui y entre, et ce qu'on peut y décider."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name="Tentes")
+        self.supplier = User.objects.create_user(
+            phone="+22670061001", password="pw", role=User.Role.SUPPLIER
+        )
+        self.visitor = User.objects.create_user(phone="+22670061002", password="pw")
+        self.staff = User.objects.create_user(phone="+22670061003", password="pw")
+        self.staff.is_staff = True
+        self.staff.save(update_fields=["is_staff"])
+
+        self.pending = self._product("Tente en attente", Product.Status.PENDING)
+        self.draft = self._product("Import en brouillon", Product.Status.DRAFT)
+        self.approved = self._product("Déjà publiée", Product.Status.APPROVED, active=True)
+
+        self.queue_url = reverse("api:product-moderation")
+
+    def _product(self, title, state, *, active=False):
+        return Product.objects.create(
+            supplier=self.supplier.supplier_profile, category=self.category,
+            title=title, price=5000, city="Ouagadougou", status=state, is_active=active,
+        )
+
+    # --- accès ---------------------------------------------------------
+    def test_the_queue_is_closed_to_anonymous_and_ordinary_users(self):
+        self.assertEqual(self.client.get(self.queue_url).status_code, status.HTTP_401_UNAUTHORIZED)
+
+        for who in (self.visitor, self.supplier):
+            with self.subTest(who=who.phone):
+                self.client.force_authenticate(who)
+                self.assertEqual(
+                    self.client.get(self.queue_url).status_code, status.HTTP_403_FORBIDDEN
+                )
+
+    def test_a_supplier_cannot_publish_their_own_listing(self):
+        """Le contrôle est refait côté serveur, pas seulement dans l'écran."""
+        self.client.force_authenticate(self.supplier)
+        response = self.client.post(
+            reverse("api:product-moderate", args=[self.pending.slug]), {"action": "approve"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.pending.refresh_from_db()
+        self.assertEqual(self.pending.status, Product.Status.PENDING)
+
+    # --- file ----------------------------------------------------------
+    def test_the_queue_shows_what_awaits_a_decision(self):
+        self.client.force_authenticate(self.staff)
+        data = self.client.get(self.queue_url).data
+
+        titles = {row["title"] for row in data["results"]}
+        self.assertEqual(titles, {"Tente en attente", "Import en brouillon"})
+        # Une annonce déjà publiée n'encombre pas la file par défaut.
+        self.assertNotIn("Déjà publiée", titles)
+
+    def test_the_queue_can_be_filtered_by_status_and_provenance(self):
+        self.client.force_authenticate(self.staff)
+
+        only_draft = self.client.get(self.queue_url, {"status": "draft"}).data
+        self.assertEqual([r["title"] for r in only_draft["results"]], ["Import en brouillon"])
+
+        published = self.client.get(self.queue_url, {"status": "approved"}).data
+        self.assertEqual([r["title"] for r in published["results"]], ["Déjà publiée"])
+
+        owned = self.client.get(self.queue_url, {"provenance": "nogoya_owner"}).data
+        self.assertEqual(owned["count"], 2)
+        referenced = self.client.get(self.queue_url, {"provenance": "external_reference"}).data
+        self.assertEqual(referenced["count"], 0)
+
+    def test_the_queue_carries_every_photo_not_just_the_cover(self):
+        """On refuse souvent une annonce sur sa deuxième image."""
+        for order in range(3):
+            ProductImage.objects.create(
+                product=self.pending,
+                image=SimpleUploadedFile(f"p{order}.jpg", b"\xff\xd8\xff", content_type="image/jpeg"),
+                order=order,
+                is_cover=order == 0,
+            )
+        self.client.force_authenticate(self.staff)
+        row = next(
+            r for r in self.client.get(self.queue_url).data["results"]
+            if r["title"] == "Tente en attente"
+        )
+        self.assertEqual(len(row["images"]), 3)
+        self.assertIn("description", row)
+
+    def test_the_queue_never_exposes_supplier_contact_details(self):
+        self.client.force_authenticate(self.staff)
+        body = str(self.client.get(self.queue_url).data)
+        self.assertNotIn(self.supplier.phone, body)
+
+    # --- décisions -----------------------------------------------------
+    def test_approving_publishes_and_timestamps(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            reverse("api:product-moderate", args=[self.pending.slug]), {"action": "approve"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        self.pending.refresh_from_db()
+        self.assertEqual(self.pending.status, Product.Status.APPROVED)
+        self.assertTrue(self.pending.is_active)
+        self.assertIsNotNone(self.pending.published_at)
+        # Et elle devient visible du public.
+        self.assertEqual(self.client.get(reverse("api:product-list")).data["count"], 2)
+
+    def test_each_refusal_removes_the_listing_from_the_public_catalogue(self):
+        self.client.force_authenticate(self.staff)
+        for decision, expected in (
+            ("reject", Product.Status.REJECTED),
+            ("unavailable", Product.Status.UNAVAILABLE),
+            ("archive", Product.Status.ARCHIVED),
+        ):
+            with self.subTest(decision=decision):
+                self.client.post(
+                    reverse("api:product-moderate", args=[self.approved.slug]),
+                    {"action": decision},
+                )
+                self.approved.refresh_from_db()
+                self.assertEqual(self.approved.status, expected)
+                self.assertFalse(self.approved.is_active)
+
+    def test_an_unknown_decision_is_refused(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            reverse("api:product-moderate", args=[self.pending.slug]), {"action": "supprimer"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Décision inconnue", response.data["action"][0])
+        self.pending.refresh_from_db()
+        self.assertEqual(self.pending.status, Product.Status.PENDING)
+
+    def test_a_decision_reaches_a_listing_the_public_cannot_see(self):
+        """Une annonce en brouillon est 404 pour tous — sauf à la modération."""
+        self.client.force_authenticate(self.staff)
+        self.assertEqual(
+            self.client.get(reverse("api:product-detail", args=[self.draft.slug])).status_code,
+            status.HTTP_200_OK,  # le staff y a déjà accès
+        )
+        response = self.client.post(
+            reverse("api:product-moderate", args=[self.draft.slug]), {"action": "approve"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+
+class PhoneNumberIsNeverPublishedTests(APITestCase):
+    """Le numéro ne sort que par `/contact/`, jamais par un repli d'affichage.
+
+    `get_full_name() or phone` paraissait anodin : il suffisait qu'un
+    fournisseur n'ait pas renseigné son nom pour que son numéro s'affiche
+    sur chacune de ses cartes, indexable par les moteurs de recherche.
+    """
+
+    def setUp(self):
+        category = Category.objects.create(name="Tentes")
+        self.anonymous_supplier = User.objects.create_user(
+            phone="+22670062001", password="pw", role=User.Role.SUPPLIER
+        )
+        self.product = Product.objects.create(
+            supplier=self.anonymous_supplier.supplier_profile, category=category,
+            title="Tente sans nom de vendeur", price=5000, city="Ouagadougou",
+            status=Product.Status.APPROVED, is_active=True,
+        )
+
+    def test_the_public_list_shows_a_label_not_a_number(self):
+        row = self.client.get(reverse("api:product-list")).data["results"][0]
+        self.assertEqual(row["supplier_name"], "Annonceur")
+        self.assertNotIn(self.anonymous_supplier.phone, str(row))
+
+    def test_the_public_detail_shows_a_label_not_a_number(self):
+        data = self.client.get(reverse("api:product-detail", args=[self.product.slug])).data
+        self.assertNotIn(self.anonymous_supplier.phone, str(data))
+        self.assertEqual(data["supplier"]["user"]["full_name"], "Utilisateur")
+
+    def test_contact_remains_the_only_way_to_obtain_the_number(self):
+        visitor = User.objects.create_user(phone="+22670062002", password="pw")
+        self.client.force_authenticate(visitor)
+        data = self.client.post(reverse("api:product-contact", args=[self.product.slug])).data
+        self.assertEqual(data["phone"], self.anonymous_supplier.phone)

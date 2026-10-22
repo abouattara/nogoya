@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -16,7 +17,12 @@ from apps.analytics.services import record_contact_event, record_product_view, r
 
 from .filters import ProductFilter, apply_attribute_filters
 from .models import Category, Favorite, Product, ProductImage
-from .permissions import IsImageOwnerOrReadOnly, IsOwnerSupplierOrReadOnly, IsSupplier
+from .permissions import (
+    IsImageOwnerOrReadOnly,
+    IsOwnerSupplierOrReadOnly,
+    IsStaff,
+    IsSupplier,
+)
 from .serializers import (
     CategorySerializer,
     FavoriteSerializer,
@@ -25,6 +31,7 @@ from .serializers import (
     ProductImageUpdateSerializer,
     ProductListSerializer,
     ProductWriteSerializer,
+    ModerationProductSerializer,
 )
 from .services import compress_product_image
 from .tasks import compress_product_image_task
@@ -137,6 +144,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsSupplier()]
         if self.action in ("update", "partial_update", "destroy", "upload_images", "toggle_active"):
             return [permissions.IsAuthenticated(), IsOwnerSupplierOrReadOnly()]
+        if self.action in ("moderation", "moderate"):
+            return [permissions.IsAuthenticated(), IsStaff()]
         if self.action in ("contact", "toggle_favorite"):
             return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
@@ -292,6 +301,86 @@ class ProductViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_207_MULTI_STATUS,
             )
         return Response(payload, status=status.HTTP_201_CREATED)
+
+    # --- modération ------------------------------------------------------
+    #
+    # Les annonces des membres et les annonces importées passent par le
+    # même écran : la question posée est la même — ce bien mérite-t-il
+    # d'être montré ? — et les séparer ferait oublier l'une des deux files.
+
+    #: Ce qu'un modérateur peut décider, et l'état qui en découle.
+    MODERATION_ACTIONS = {
+        "approve": (Product.Status.APPROVED, True),
+        "reject": (Product.Status.REJECTED, False),
+        "unavailable": (Product.Status.UNAVAILABLE, False),
+        "archive": (Product.Status.ARCHIVED, False),
+        "pending": (Product.Status.PENDING, False),
+    }
+
+    @action(detail=False, methods=["get"], url_path="moderation")
+    def moderation(self, request):
+        """La file d'attente, filtrable par état, provenance et ville."""
+        queryset = (
+            Product.objects.select_related("category", "supplier__user", "source")
+            .prefetch_related("images")
+            .order_by("-created_at")
+        )
+
+        statuses = [s for s in request.query_params.getlist("status") if s]
+        if not statuses:
+            # Par défaut, ce qui attend réellement une décision : les
+            # annonces des membres et les brouillons issus d'un import.
+            statuses = [Product.Status.PENDING, Product.Status.DRAFT]
+        valid = {value for value, _ in Product.Status.choices}
+        queryset = queryset.filter(status__in=[s for s in statuses if s in valid])
+
+        provenance = request.query_params.get("provenance")
+        if provenance in dict(Product.Provenance.choices):
+            queryset = queryset.filter(provenance=provenance)
+
+        city = request.query_params.get("city")
+        if city:
+            queryset = queryset.filter(city__iexact=city)
+
+        search = request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                models.Q(title__icontains=search) | models.Q(description__icontains=search)
+            )
+
+        page = self.paginate_queryset(queryset)
+        serializer = ModerationProductSerializer(page, many=True, context={"request": request})
+        return self.get_paginated_response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="moderate")
+    def moderate(self, request, slug=None):
+        """Applique une décision à une annonce."""
+        decision = request.data.get("action")
+        if decision not in self.MODERATION_ACTIONS:
+            return Response(
+                {"action": [
+                    f"Décision inconnue : {decision!r}. "
+                    f"Attendu : {', '.join(sorted(self.MODERATION_ACTIONS))}."
+                ]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # `get_object` masque les annonces non publiques aux non-propriétaires ;
+        # un modérateur doit justement les atteindre.
+        product = get_object_or_404(Product, slug=slug)
+        new_status, visible = self.MODERATION_ACTIONS[decision]
+
+        product.status = new_status
+        product.is_active = visible
+        if visible and product.published_at is None:
+            product.published_at = timezone.now()
+        product.save(update_fields=["status", "is_active", "published_at", "updated_at"])
+
+        logger.info(
+            "Modération : %s -> %s par %s", product.slug, new_status, request.user.phone
+        )
+        serializer = ModerationProductSerializer(product, context={"request": request})
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"])
     def contact(self, request, slug=None):

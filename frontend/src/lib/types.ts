@@ -49,6 +49,12 @@ export interface Me {
   role: Role;
   is_phone_verified: boolean;
   created_at: string;
+  /**
+   * Sert a proposer — ou non — l'ecran de moderation. Ce n'est pas un
+   * controle d'acces : chaque appel d'administration est revalide cote
+   * serveur, et masquer un lien ne protege rien.
+   */
+  is_staff: boolean;
 }
 
 export interface Category {
@@ -305,6 +311,26 @@ export interface LiveSession {
   playback_url: string;
   live_products: LiveProductEntry[];
   created_at: string;
+}
+
+/** Les decisions qu'un moderateur peut prendre sur une annonce. */
+export type ModerationDecision = "approve" | "reject" | "unavailable" | "archive" | "pending";
+
+/**
+ * Une annonce vue par la moderation : toutes ses photos et sa description
+ * entiere, parce qu'on refuse souvent sur la deuxieme image ou sur un
+ * detail du texte.
+ */
+export interface ModerationProduct extends ProductListItem {
+  description: string;
+  images: ProductImage[];
+  location: string;
+  region: string;
+  country: string;
+  category_name: string;
+  source_url: string;
+  last_checked_at: string | null;
+  published_at: string | null;
 }
 
 export interface ProductFiltersQuery {

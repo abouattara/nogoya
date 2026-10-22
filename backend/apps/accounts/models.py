@@ -70,6 +70,22 @@ class User(AbstractUser):
         full = self.get_full_name()
         return f"{full} ({self.phone})" if full else self.phone
 
+    def public_name(self, fallback="Utilisateur"):
+        """Le nom à montrer à autrui — jamais le numéro de téléphone.
+
+        Le téléphone n'est révélé que par `/products/{slug}/contact/`, à un
+        visiteur connecté qui en fait explicitement la demande, et
+        l'ouverture est comptabilisée. Un repli `get_full_name() or phone`
+        contournait toute cette mécanique : il suffisait qu'un fournisseur
+        n'ait pas renseigné son nom pour que son numéro s'affiche sur
+        chacune de ses cartes d'annonce, visible des moteurs de recherche.
+
+        Le repli est paramétrable parce qu'un même utilisateur se nomme
+        différemment selon l'écran : « Annonceur » sur une annonce,
+        « Utilisateur » dans une conversation.
+        """
+        return self.get_full_name() or fallback
+
     @property
     def is_supplier(self):
         return self.role == self.Role.SUPPLIER

@@ -18,7 +18,7 @@ class UserPublicSerializer(serializers.ModelSerializer):
         fields = ["id", "full_name", "avatar", "role", "created_at"]
 
     def get_full_name(self, obj):
-        return obj.get_full_name() or obj.phone
+        return obj.public_name()
 
 
 class MeSerializer(serializers.ModelSerializer):
@@ -27,8 +27,14 @@ class MeSerializer(serializers.ModelSerializer):
         fields = [
             "id", "phone", "first_name", "last_name", "email", "gender",
             "birth_date", "avatar", "role", "is_phone_verified", "created_at",
+            # Le frontend en a besoin pour proposer — ou non — l'écran de
+            # modération. Ce n'est pas un contrôle d'accès : chaque appel
+            # d'administration est revérifié côté serveur.
+            "is_staff",
         ]
-        read_only_fields = ["id", "phone", "role", "is_phone_verified", "created_at"]
+        read_only_fields = [
+            "id", "phone", "role", "is_phone_verified", "created_at", "is_staff",
+        ]
 
 
 class RegisterSerializer(serializers.ModelSerializer):

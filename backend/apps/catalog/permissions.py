@@ -32,3 +32,18 @@ class IsImageOwnerOrReadOnly(permissions.BasePermission):
             return True
         profile = getattr(request.user, "supplier_profile", None)
         return profile is not None and obj.product.supplier_id == profile.pk
+
+
+class IsStaff(permissions.BasePermission):
+    """Réservé à l'équipe : modération des annonces.
+
+    Distinct de `IsSupplier`, qui laisse passer un fournisseur ordinaire.
+    Ici seul un compte d'équipe entre, et la vérification est refaite à
+    chaque appel — l'absence du lien dans l'interface n'est pas une
+    protection.
+    """
+
+    message = "Réservé à l'équipe de modération."
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_staff)

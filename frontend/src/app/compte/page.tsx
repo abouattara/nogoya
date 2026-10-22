@@ -35,6 +35,7 @@ export default function AccountPage() {
               {user.role === "supplier" && (
                 <ButtonLink href="/compte/fournisseur">Tableau de bord fournisseur</ButtonLink>
               )}
+              <ModerationLink />
             </div>
           </div>
 
@@ -47,6 +48,27 @@ export default function AccountPage() {
         </div>
       )}
     </RequireAuth>
+  );
+}
+
+/**
+ * Le lien vers la moderation, montre a l'equipe seulement.
+ *
+ * La requete partage la cle ["me"] du formulaire de profil : React Query
+ * la dedoublonne, donc aucun appel supplementaire. Masquer le lien n'est
+ * pas une protection — l'API revalide `is_staff` a chaque appel — c'est
+ * seulement ne pas proposer une porte fermee.
+ */
+function ModerationLink() {
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiFetch<Me>("/api/v1/auth/me/"),
+  });
+  if (!me?.is_staff) return null;
+  return (
+    <ButtonLink href="/compte/moderation" variant="secondary">
+      Modération
+    </ButtonLink>
   );
 }
 
