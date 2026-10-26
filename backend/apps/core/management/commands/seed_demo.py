@@ -28,6 +28,16 @@ from apps.notifications.models import Notification
 from apps.notifications.services import notify
 from apps.suppliers.models import SupplierProfile
 
+#: Les comptes fabriqués par ce seed, et eux seuls.
+#
+# Déclarés ici plutôt que recopiés dans la commande de purge : si un
+# numéro change, la purge doit suivre, sinon elle laisserait des comptes
+# de démonstration en production en croyant les avoir supprimés.
+DEMO_SUPPLIER_PHONES = ["+22670010001", "+22670010002"]
+DEMO_VISITOR_PHONE = "+22670020001"
+DEMO_PHONES = [*DEMO_SUPPLIER_PHONES, DEMO_VISITOR_PHONE]
+DEMO_PASSWORD = "DemoPass123!"
+
 User = get_user_model()
 
 # Per-category attributes, declared as data (see CategoryAttribute).

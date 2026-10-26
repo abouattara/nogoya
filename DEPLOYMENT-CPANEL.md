@@ -448,6 +448,47 @@ Sauvegardes : cPanel → *Backup Wizard* pour la base, et une copie du dossier
 `media/` — les images d'annonces ne sont nulle part ailleurs tant que
 `USE_S3` est désactivé.
 
+### Vider le site de ses données de démonstration
+
+Avant d'ouvrir le site au public, il faut retirer ce que `seed_demo` a
+fabriqué. **Sauvegardez d'abord** (cPanel → *Backup Wizard*) : une
+suppression ne se rattrape pas.
+
+La simulation est le comportement par défaut — elle compte sans rien
+écrire :
+
+```bash
+source ~/virtualenv/nogoya/backend/3.11/bin/activate && cd ~/nogoya/backend && python manage.py purge_data
+```
+
+Puis, pour agir :
+
+```bash
+python manage.py purge_data --yes
+```
+
+Deux portées :
+
+| Commande | Ce qui part |
+| --- | --- |
+| `--scope demo` (défaut) | Les trois comptes semés et tout ce qu'ils possèdent |
+| `--scope all` | **Toutes** les annonces, conversations et statistiques ; comptes, catégories et attributs conservés |
+
+Un compte **d'équipe ou superutilisateur n'est jamais supprimé**, même s'il
+porte un numéro de démonstration : se verrouiller dehors de son propre site
+est une erreur qu'on ne commet qu'une fois. La commande dit lesquels elle a
+épargnés.
+
+`--phone +226…` ajoute un compte à supprimer, de façon répétable.
+
+**Les fichiers images ne partent pas avec les lignes** — Django laisse les
+octets derrière lui. Enchaînez toujours :
+
+```bash
+python manage.py prune_media            # pour voir
+python manage.py prune_media --delete   # pour supprimer
+```
+
 ### Import des annonces référencées
 
 Il n'y a pas de worker Celery sur un mutualisé : l'import récurrent passe
