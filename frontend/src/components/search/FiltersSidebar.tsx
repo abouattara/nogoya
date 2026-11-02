@@ -34,7 +34,6 @@ export function FiltersSidebar({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeCategory = searchParams.get("category");
-  const activeListingType = searchParams.get("listing_type");
   const activeProvenance = searchParams.get("provenance");
 
   const [city, setCity] = useState(searchParams.get("city") ?? "");
@@ -90,23 +89,6 @@ export function FiltersSidebar({ categories }: { categories: Category[] }) {
               )}
             </li>
           ))}
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Type d&apos;offre</h3>
-        <ul className="flex flex-col gap-1">
-          <FilterLink label="Tous" active={!activeListingType} href={`/produits?${withParam(searchParams, "listing_type")}`} />
-          <FilterLink
-            label="Location"
-            active={activeListingType === "rent"}
-            href={`/produits?${withParam(searchParams, "listing_type", "rent")}`}
-          />
-          <FilterLink
-            label="Vente"
-            active={activeListingType === "sale"}
-            href={`/produits?${withParam(searchParams, "listing_type", "sale")}`}
-          />
         </ul>
       </div>
 

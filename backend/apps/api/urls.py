@@ -17,6 +17,8 @@ from apps.messaging.api import ConversationViewSet, MessageReportView
 from apps.notifications.api import NotificationViewSet
 from apps.suppliers.api import SupplierViewSet
 
+from apps.rentals.api import RentalRequestViewSet
+
 router = DefaultRouter()
 router.register("categories", CategoryViewSet, basename="category")
 router.register("products", ProductViewSet, basename="product")
@@ -28,6 +30,7 @@ router.register("message-reports", MessageReportView, basename="message-report")
 router.register("notifications", NotificationViewSet, basename="notification")
 router.register("lives", LiveSessionViewSet, basename="live")
 router.register("discovery", DiscoveryViewSet, basename="discovery")
+router.register("rental-requests", RentalRequestViewSet, basename="rental-request")
 
 urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="auth-register"),

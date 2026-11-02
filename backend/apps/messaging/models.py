@@ -7,12 +7,26 @@ from apps.core.models import TimeStampedModel
 
 
 class Conversation(TimeStampedModel):
-    """A 1:1 thread between two users, optionally started from a product.
+    """Un fil entre un membre et l'équipe NOGOYA, à propos d'une annonce.
 
-    Participants are stored as an ordered pair (lower user id first) so a
-    unique constraint can prevent duplicate conversations between the same
-    two people — see `services.get_or_create_conversation`.
+    **Le schéma a changé au lancement « location ».** Avant, un visiteur
+    parlait directement au fournisseur. Désormais NOGOYA est au centre : un
+    fournisseur échange avec l'équipe pour compléter ses annonces, un client
+    échange avec l'équipe à propos d'un bien, et les deux ne se parlent
+    jamais directement. C'est ce qui permet de vérifier une disponibilité
+    avant de mettre en relation, et de ne pas livrer un numéro de téléphone
+    sans l'avoir décidé.
+
+    La paire ordonnée est conservée — l'un des deux côtés est le compte de
+    service « NOGOYA » — parce que tout ce qui lit `has_participant`, les
+    non-lus et les blocages continue de fonctionner. Ce que l'équipe écrit
+    part au nom de NOGOYA ; `Message.staff_author` garde en interne quel
+    membre de l'équipe a répondu.
     """
+
+    class Audience(models.TextChoices):
+        CLIENT = "client", _("Client")
+        SUPPLIER = "supplier", _("Fournisseur")
 
     participant_low = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+"
@@ -26,10 +40,27 @@ class Conversation(TimeStampedModel):
         help_text=_("Le produit à l'origine de la conversation (contexte affiché dans la liste)."),
     )
 
+    audience = models.CharField(
+        _("interlocuteur"), max_length=10, choices=Audience.choices, default=Audience.CLIENT,
+        db_index=True,
+        help_text=_("Ce que le membre est pour NOGOYA dans ce fil : un client ou un fournisseur."),
+    )
+
     class Meta:
         constraints = [
+            # Un fil par annonce, et un fil général sans annonce. Les deux
+            # contraintes sont nécessaires : une contrainte unique traite
+            # deux NULL comme distincts, donc la première seule laisserait
+            # créer autant de fils généraux qu'on veut.
             models.UniqueConstraint(
-                fields=["participant_low", "participant_high"], name="unique_conversation_pair"
+                fields=["participant_low", "participant_high", "initial_product"],
+                condition=models.Q(initial_product__isnull=False),
+                name="unique_thread_per_pair_and_product",
+            ),
+            models.UniqueConstraint(
+                fields=["participant_low", "participant_high"],
+                condition=models.Q(initial_product__isnull=True),
+                name="unique_general_thread_per_pair",
             ),
         ]
         ordering = ["-updated_at"]
@@ -89,6 +120,14 @@ class Message(models.Model):
     body = models.TextField(_("message"), blank=True)
     shared_product = models.ForeignKey(
         "catalog.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="shared_in_messages",
+    )
+    staff_author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="authored_support_messages", verbose_name=_("rédigé par"),
+        help_text=_(
+            "Le membre de l'équipe qui a réellement écrit ce message. "
+            "Interne : le destinataire voit « NOGOYA »."
+        ),
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     read_at = models.DateTimeField(null=True, blank=True)

@@ -63,6 +63,7 @@ LOCAL_APPS = [
     "apps.notifications",
     "apps.live",
     "apps.sourcing",
+    "apps.rentals",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -205,6 +206,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # are the numbers that protect the bucket bill.
 # Dossier ou les partenaires deposent leurs exports CSV. Hors du depot :
 # ce sont leurs donnees, et elles n'ont rien a faire dans Git.
+# ---------------------------------------------------------------------------
+# Lancement : location seulement
+# ---------------------------------------------------------------------------
+# La vente reste dans le modele de donnees — les annonces deja saisies ne
+# sont pas detruites — mais elle disparait du catalogue public et du
+# formulaire. Un drapeau plutot qu'une suppression : rouvrir la vente ne
+# doit pas demander un deploiement de code.
+LAUNCH_RENTAL_ONLY = env.bool("LAUNCH_RENTAL_ONLY", default=True)
+
 SOURCING_IMPORT_DIR = env("SOURCING_IMPORT_DIR", default=str(BASE_DIR / "imports"))
 
 MAX_IMAGE_UPLOAD_BYTES = env.int("MAX_IMAGE_UPLOAD_BYTES", default=12 * 1024 * 1024)

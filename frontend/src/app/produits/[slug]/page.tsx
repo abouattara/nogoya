@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/Feedback";
 import { ProductGallery } from "@/components/product/ProductGallery";
-import { ContactSupplierCard } from "@/components/product/ContactSupplierCard";
 import { ExternalListingCard } from "@/components/product/ExternalListingCard";
+import { RentalRequestCard } from "@/components/product/RentalRequestCard";
 import { ShareButton } from "@/components/product/ShareButton";
 import { FavoriteButton } from "@/components/product/FavoriteButton";
 import { getProduct } from "@/lib/api";
@@ -137,10 +137,11 @@ export default async function ProductDetailPage({ params }: PageProps<"/produits
           {/* Deux parcours distincts : NOGOYA ne propose un contact que
               pour les biens dont elle repond. */}
           {product.supplier ? (
-            <ContactSupplierCard
+            /* Plus de contact direct : le client passe une demande, nous
+               verifions la disponibilite, puis nous mettons en relation. */
+            <RentalRequestCard
               slug={product.slug}
               productId={product.id}
-              supplier={product.supplier}
               productTitle={product.title}
             />
           ) : (

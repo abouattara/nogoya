@@ -26,7 +26,15 @@ from .serializers import (
     MessageCreateSerializer,
     MessageSerializer,
 )
-from .services import get_or_create_conversation, mark_read, participant_filter, unread_count_for
+from .services import (
+    SUPPORT_NAME,
+    get_or_create_support_thread,
+    mark_read,
+    member_of,
+    participant_filter,
+    support_account,
+    unread_count_for,
+)
 
 User = get_user_model()
 
@@ -62,17 +70,35 @@ class ConversationViewSet(
     queryset = Conversation.objects.none()
 
     def get_queryset(self):
-        return Conversation.objects.filter(participant_filter(self.request.user)).select_related(
+        base = Conversation.objects.select_related(
             "participant_low", "participant_high", "initial_product"
         )
+        # L'équipe voit tous les fils : c'est elle qui répond. Un membre ne
+        # voit que les siens.
+        if self.request.user.is_staff:
+            return base
+        return base.filter(participant_filter(self.request.user))
 
     def create(self, request, *args, **kwargs):
+        """Ouvre — ou retrouve — le fil avec NOGOYA à propos d'un bien.
+
+        Plus aucune conversation ne vise un fournisseur : le client
+        s'adresse à l'équipe, qui vérifiera auprès du fournisseur. C'est ce
+        qui permet de ne pas annoncer une disponibilité qu'on n'a pas
+        vérifiée.
+        """
+        product = None
         product_id = request.data.get("product")
-        product = get_object_or_404(Product, pk=product_id, status=Product.Status.APPROVED, is_active=True)
-        supplier_user = product.supplier.user
-        if supplier_user.id == request.user.id:
-            return Response({"detail": "Vous ne pouvez pas démarrer une conversation avec vous-même."}, status=status.HTTP_400_BAD_REQUEST)
-        conversation, _created = get_or_create_conversation(request.user, supplier_user, product=product)
+        if product_id:
+            product = get_object_or_404(
+                Product, pk=product_id, status=Product.Status.APPROVED, is_active=True
+            )
+        if request.user.pk == support_account().pk:
+            return Response(
+                {"detail": "Compte de service."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        conversation, _created = get_or_create_support_thread(request.user, product=product)
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -112,7 +138,21 @@ class ConversationViewSet(
                 # One transaction: a message that kept only three of its four
                 # photos would be worse than one that was refused outright.
                 with transaction.atomic():
-                    message = serializer.save(conversation=conversation, sender=request.user)
+                    # L'équipe écrit au nom de NOGOYA : le membre voit un
+                    # interlocuteur unique, pas le nom de la personne qui
+                    # était de permanence. `staff_author` garde en interne
+                    # qui a réellement répondu — sans cela, impossible de
+                    # savoir qui a dit quoi.
+                    if request.user.is_staff:
+                        message = serializer.save(
+                            conversation=conversation,
+                            sender=support_account(),
+                            staff_author=request.user,
+                        )
+                    else:
+                        message = serializer.save(
+                            conversation=conversation, sender=request.user
+                        )
                     build_attachments(
                         message,
                         images=images,
@@ -161,8 +201,20 @@ class ConversationViewSet(
         return self.get_paginated_response(serializer.data)
 
     def _notify_recipient(self, conversation, message):
-        recipient = conversation.other_participant(message.sender)
-        sender_name = message.sender.public_name()
+        """Prévient l'autre côté du fil.
+
+        Quand l'équipe répond, le destinataire est le membre et l'expéditeur
+        annoncé est « NOGOYA ». Quand le membre écrit, il n'y a personne à
+        notifier côté équipe : le compte de service ne reçoit pas de
+        notification, c'est la file de modération qui sert de boîte de
+        réception.
+        """
+        support = support_account()
+        member = member_of(conversation)
+        if message.sender_id != support.pk:
+            return  # message du membre : rien à notifier côté service
+        recipient = member
+        sender_name = support.public_name(SUPPORT_NAME)
         preview = TYPE_PREVIEW.get(message.message_type) or message.body[:120] or "📎 Annonce jointe"
         notify(
             recipient,
@@ -244,7 +296,9 @@ class MessageReportView(mixins.CreateModelMixin, viewsets.GenericViewSet):
     def create(self, request, *args, **kwargs):
         message_id = request.data.get("message")
         message = get_object_or_404(Message, pk=message_id)
-        if not message.conversation.has_participant(request.user):
+        # L'équipe traite tous les fils : elle doit pouvoir signaler
+        # un message qu'elle est seule à voir.
+        if not (request.user.is_staff or message.conversation.has_participant(request.user)):
             return Response(status=status.HTTP_404_NOT_FOUND)
         MessageReport.objects.create(
             message=message, reported_by=request.user, reason=request.data.get("reason", "")

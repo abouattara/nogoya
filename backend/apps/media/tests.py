@@ -21,7 +21,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.media.processing import DISPLAY_SIZE, UnprocessableImage, render_image
 from apps.messaging.models import Message
-from apps.messaging.services import get_or_create_conversation
+from apps.messaging.services import get_or_create_support_thread
 from apps.suppliers.models import SupplierProfile
 
 User = get_user_model()
@@ -102,8 +102,8 @@ class OrphanCleanupTests(TestCase):
             category=Category.objects.create(name="Divers"),
             title="Tente", price=1000, city="Bobo", status=Product.Status.APPROVED,
         )
-        self.conversation = get_or_create_conversation(
-            self.visitor, self.supplier_user, product=self.product
+        self.conversation = get_or_create_support_thread(
+            self.visitor, product=self.product
         )[0]
 
     def _attachment(self):

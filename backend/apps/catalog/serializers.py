@@ -1,5 +1,6 @@
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework import serializers
 
@@ -252,6 +253,20 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "latitude", "longitude", "place_id", "location_precision", "attributes",
         ]
         read_only_fields = ["slug"]
+
+    def validate_listing_type(self, value):
+        """La vente est fermee pendant le lancement.
+
+        La verification est ici et non seulement dans le formulaire : une
+        annonce de vente creee par un appel direct a l'API serait invisible
+        au catalogue, donc introuvable par son auteur — un echec silencieux
+        vaut moins qu'un refus explicite.
+        """
+        if settings.LAUNCH_RENTAL_ONLY and value == Product.ListingType.SALE:
+            raise serializers.ValidationError(
+                "Seules les annonces de location sont acceptees pour le moment."
+            )
+        return value
 
     def validate_category(self, value):
         if value is not None and value.children.exists():

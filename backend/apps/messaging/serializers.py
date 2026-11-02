@@ -5,6 +5,7 @@ from apps.catalog.serializers import ProductListSerializer
 from apps.media.serializers import MessageAttachmentSerializer
 
 from .models import Conversation, Message
+from .services import member_of, support_account
 
 # What the conversation list shows instead of a body, per message type.
 TYPE_PREVIEW = {
@@ -55,12 +56,23 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ["id", "other_participant", "initial_product", "last_message", "unread_count", "updated_at"]
+        fields = [
+            "id", "other_participant", "initial_product", "last_message",
+            "unread_count", "audience", "updated_at",
+        ]
 
     def get_other_participant(self, obj):
+        """Qui le lecteur a en face de lui.
+
+        Un membre a toujours NOGOYA en face : c'est la promesse du schéma
+        intermédié, et afficher le nom de la personne de permanence la
+        romprait. L'équipe, elle, a besoin de savoir à qui elle parle.
+        """
         request = self.context.get("request")
-        other = obj.other_participant(request.user)
-        return UserPublicSerializer(other, context=self.context).data
+        member = member_of(obj)
+        if request and request.user.is_staff:
+            return UserPublicSerializer(member, context=self.context).data
+        return UserPublicSerializer(support_account(), context=self.context).data
 
     def get_last_message(self, obj):
         last = obj.messages.order_by("-created_at").first()

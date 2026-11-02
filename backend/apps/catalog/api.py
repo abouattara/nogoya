@@ -1,6 +1,7 @@
 import errno
 import logging
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.http import Http404
@@ -40,6 +41,45 @@ from apps.media.validators import validate_image_upload
 
 
 logger = logging.getLogger("nogoya.catalog")
+
+
+def _schedule_compression(image):
+    """Demander le traitement d'une image, sans jamais faire échouer l'envoi.
+
+    Les octets sont déjà sur le disque et la ligne est en base : à partir
+    de là, plus rien ne justifie de répondre une erreur au vendeur.
+
+    `delay()` n'est pas anodin. Hors du mode « eager », elle écrit dans un
+    courtier — Redis — qui n'existe pas sur un hébergement mutualisé : la
+    connexion est refusée **après** l'enregistrement, et l'envoi ressortait
+    en 500 alors que la photo était bien là.
+
+    En repli, on compresse sur place : c'est de toute façon ce que le mode
+    « eager » aurait fait.
+    """
+    try:
+        compress_product_image_task.delay(image.pk)
+        return
+    except Exception:
+        logger.exception(
+            "Impossible de confier l'image %s au worker ; traitement sur place.", image.pk
+        )
+
+    try:
+        compress_product_image(image)
+    except Exception:
+        # Une vignette ratée laisse l'original affichable : l'annonce vaut
+        # mieux que son optimisation.
+        logger.exception("Compression sur place échouée pour l'image %s", image.pk)
+
+
+def _serialize(images, request):
+    """Le rendu de la réponse ne doit pas perdre un travail déjà accompli."""
+    try:
+        return ProductImageSerializer(images, many=True, context={"request": request}).data
+    except Exception:
+        logger.exception("Sérialisation des images impossible ; repli sur les identifiants.")
+        return [{"id": image.pk, "order": image.order, "is_cover": image.is_cover} for image in images]
 
 
 def _is_owner(user, product):
@@ -109,6 +149,11 @@ class ProductViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(supplier__user=user)
             else:
                 qs = qs.filter(status=Product.Status.APPROVED, is_active=True)
+                if settings.LAUNCH_RENTAL_ONLY:
+                    # Le lancement ne porte que la location. Les annonces de
+                    # vente deja saisies restent en base et visibles de leur
+                    # proprietaire ; elles sortent seulement du catalogue.
+                    qs = qs.filter(listing_type=Product.ListingType.RENT)
             return apply_attribute_filters(qs, self.request.query_params)
         if self.action == "retrieve":
             qs = qs.prefetch_related("attribute_values__attribute")
@@ -334,6 +379,25 @@ class ProductViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+        # Le verrou du schéma intermédié. Un client ne voit les coordonnées
+        # du fournisseur que si l'équipe les lui a transmises, après avoir
+        # vérifié la disponibilité. Le contrôle est ici, pas dans
+        # l'interface : masquer un bouton n'empêche pas d'appeler l'API.
+        from apps.rentals.api import contact_is_released, supplier_owns
+
+        if not (supplier_owns(request.user, product) or contact_is_released(request.user, product)):
+            return Response(
+                {
+                    "detail": (
+                        "Les coordonnées du fournisseur sont transmises par l'équipe NOGOYA "
+                        "une fois la disponibilité vérifiée. Faites une demande de location "
+                        "pour ce bien."
+                    ),
+                    "needs_rental_request": True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         channel = request.data.get("channel", "phone")
         if channel not in ("phone", "whatsapp"):
             channel = "phone"

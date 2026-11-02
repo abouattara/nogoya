@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image as PILImage
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -302,21 +303,46 @@ class CatalogApiTests(APITestCase):
         resp = self.client.get(reverse("api:product-detail", args=[product.slug]))
         self.assertIn("Ouagadougou", resp.data["map_url"])
 
-    def test_contact_action_reveals_and_logs_only_for_non_owner(self):
+    def test_contact_is_released_by_the_team_then_logged_once(self):
+        """Le contact n'est plus libre : il se merite par une demande traitee.
+
+        C'est le verrou du schema intermedie. Avant, tout utilisateur
+        connecte obtenait le numero ; desormais l'equipe le transmet apres
+        avoir verifie la disponibilite aupres du fournisseur.
+        """
+        from datetime import date, timedelta
+
+        from apps.analytics.models import ContactEvent
+        from apps.rentals.models import RentalRequest
+
         product = Product.objects.create(
             supplier=self.profile, category=self.leaf, title="Tente",
             price=5000, city="Bobo", status=Product.Status.APPROVED,
         )
+        url = reverse("api:product-contact", args=[product.slug])
+
         self.client.force_authenticate(self.visitor)
-        resp = self.client.post(reverse("api:product-contact", args=[product.slug]), {"channel": "phone"})
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        refuse = self.client.post(url, {"channel": "phone"})
+        self.assertEqual(refuse.status_code, status.HTTP_409_CONFLICT)
+        self.assertNotIn(self.supplier_user.phone, str(refuse.data))
+        self.assertEqual(ContactEvent.objects.filter(product=product).count(), 0)
+
+        debut = date.today() + timedelta(days=3)
+        RentalRequest.objects.create(
+            product=product, client=self.visitor,
+            start_date=debut, end_date=debut + timedelta(days=2),
+            supplier_checked_at=timezone.now(), contact_released_at=timezone.now(),
+            status=RentalRequest.Status.CONNECTED,
+        )
+
+        resp = self.client.post(url, {"channel": "phone"})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertEqual(resp.data["phone"], self.supplier_user.phone)
-        from apps.analytics.models import ContactEvent
         self.assertEqual(ContactEvent.objects.filter(product=product).count(), 1)
 
-        # the owner checking their own contact info shouldn't self-count
+        # Le proprietaire qui consulte ses propres coordonnees ne se compte pas.
         self.client.force_authenticate(self.supplier_user)
-        self.client.post(reverse("api:product-contact", args=[product.slug]))
+        self.client.post(url)
         self.assertEqual(ContactEvent.objects.filter(product=product).count(), 1)
 
     def test_share_action_increments_counter_anonymously(self):
@@ -598,8 +624,115 @@ class PhoneNumberIsNeverPublishedTests(APITestCase):
         self.assertNotIn(self.anonymous_supplier.phone, str(data))
         self.assertEqual(data["supplier"]["user"]["full_name"], "Utilisateur")
 
-    def test_contact_remains_the_only_way_to_obtain_the_number(self):
+    def test_the_number_comes_only_from_a_released_request(self):
+        """Et meme la, il faut que l'equipe l'ait transmis."""
+        from datetime import date, timedelta
+
+        from apps.rentals.models import RentalRequest
+
         visitor = User.objects.create_user(phone="+22670062002", password="pw")
         self.client.force_authenticate(visitor)
-        data = self.client.post(reverse("api:product-contact", args=[self.product.slug])).data
+        url = reverse("api:product-contact", args=[self.product.slug])
+
+        self.assertEqual(self.client.post(url).status_code, status.HTTP_409_CONFLICT)
+
+        debut = date.today() + timedelta(days=3)
+        RentalRequest.objects.create(
+            product=self.product, client=visitor,
+            start_date=debut, end_date=debut + timedelta(days=1),
+            supplier_checked_at=timezone.now(), contact_released_at=timezone.now(),
+        )
+        data = self.client.post(url).data
         self.assertEqual(data["phone"], self.anonymous_supplier.phone)
+
+
+@override_settings(LAUNCH_RENTAL_ONLY=True)
+class RentalOnlyLaunchTests(APITestCase):
+    """Le lancement ne porte que la location.
+
+    La vente n'est pas detruite : les annonces deja saisies restent en base
+    et visibles de leur proprietaire. Elles sortent du catalogue, et on ne
+    peut plus en creer.
+    """
+
+    def setUp(self):
+        self.category = Category.objects.create(name="Tentes")
+        self.supplier = User.objects.create_user(
+            phone="+22670063001", password="pw", role=User.Role.SUPPLIER
+        )
+        commun = dict(
+            supplier=self.supplier.supplier_profile, category=self.category,
+            price=5000, city="Ouagadougou",
+            status=Product.Status.APPROVED, is_active=True,
+        )
+        self.location = Product.objects.create(
+            title="Tente a louer", listing_type=Product.ListingType.RENT, **commun
+        )
+        self.vente = Product.objects.create(
+            title="Tente a vendre", listing_type=Product.ListingType.SALE, **commun
+        )
+
+    def test_the_public_catalogue_shows_rentals_only(self):
+        data = self.client.get(reverse("api:product-list")).data
+        self.assertEqual([p["title"] for p in data["results"]], ["Tente a louer"])
+
+    def test_an_existing_sale_listing_is_not_destroyed(self):
+        """Elle quitte le catalogue, elle ne disparait pas de la base."""
+        self.assertTrue(Product.objects.filter(title="Tente a vendre").exists())
+        self.client.force_authenticate(self.supplier)
+        mine = self.client.get(reverse("api:product-list"), {"mine": "true"})
+        self.assertEqual(mine.data["count"], 2)
+
+    def test_creating_a_sale_listing_is_refused(self):
+        """Un refus explicite vaut mieux qu'une annonce introuvable.
+
+        Sans ce controle, une annonce de vente creee par appel direct a
+        l'API serait invisible au catalogue, donc introuvable par son
+        auteur : un echec silencieux.
+        """
+        self.client.force_authenticate(self.supplier)
+        resp = self.client.post(
+            reverse("api:product-list"),
+            {
+                "title": "Berline a vendre", "category": self.category.pk,
+                "description": "Une berline en bon etat.", "price": 2000000,
+                "currency": "XOF", "listing_type": "sale", "rental_period": "none",
+                "city": "Ouagadougou", "location_precision": "approximate",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("location", str(resp.data["listing_type"][0]))
+
+    def test_creating_a_rental_listing_still_works(self):
+        self.client.force_authenticate(self.supplier)
+        resp = self.client.post(
+            reverse("api:product-list"),
+            {
+                "title": "Salle de fete", "category": self.category.pk,
+                "description": "Une salle pour vos evenements.", "price": 100000,
+                "currency": "XOF", "listing_type": "rent", "rental_period": "day",
+                "city": "Ouagadougou", "location_precision": "approximate",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+
+
+@override_settings(LAUNCH_RENTAL_ONLY=False)
+class SaleReopenedTests(APITestCase):
+    """Rouvrir la vente ne doit pas demander un deploiement de code."""
+
+    def test_a_flag_is_enough_to_bring_sale_back(self):
+        category = Category.objects.create(name="Tentes")
+        supplier = User.objects.create_user(
+            phone="+22670063002", password="pw", role=User.Role.SUPPLIER
+        )
+        Product.objects.create(
+            supplier=supplier.supplier_profile, category=category,
+            title="Tente a vendre", listing_type=Product.ListingType.SALE,
+            price=5000, city="Ouagadougou",
+            status=Product.Status.APPROVED, is_active=True,
+        )
+        data = self.client.get(reverse("api:product-list")).data
+        self.assertEqual(data["count"], 1)

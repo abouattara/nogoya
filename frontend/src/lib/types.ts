@@ -185,6 +185,8 @@ export interface ProductWritePayload {
   location_precision?: LocationPrecision;
 }
 
+export type ConversationAudience = "client" | "supplier";
+
 export interface ConversationSummary {
   id: number;
   other_participant: UserPublic;
@@ -332,6 +334,47 @@ export interface ModerationProduct extends ProductListItem {
   last_checked_at: string | null;
   published_at: string | null;
 }
+
+/** L'avancement d'une demande de location, vu du client. */
+export type RentalRequestStatus =
+  | "submitted"
+  | "checking"
+  | "available"
+  | "unavailable"
+  | "connected"
+  | "cancelled";
+
+export interface RentalRequest {
+  id: number;
+  product: ProductListItem;
+  start_date: string;
+  end_date: string;
+  message: string;
+  status: RentalRequestStatus;
+  status_label: string;
+  /** Vrai une fois que l'equipe a transmis les coordonnees du fournisseur. */
+  contact_released: boolean;
+  nights: number;
+  thread: number | null;
+  created_at: string;
+}
+
+/** Ce que l'equipe voit en plus : qui, quand, et la note interne. */
+export interface StaffRentalRequest extends RentalRequest {
+  client_name: string;
+  supplier_name: string;
+  handled_by_name: string | null;
+  supplier_checked_at: string | null;
+  contact_released_at: string | null;
+  staff_note: string;
+}
+
+export type RentalDecision =
+  | "checking"
+  | "available"
+  | "unavailable"
+  | "release-contact"
+  | "cancel";
 
 export interface ProductFiltersQuery {
   search?: string;

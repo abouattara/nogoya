@@ -441,9 +441,12 @@ export function ProductForm({ mode, product }: ProductFormProps) {
       <Textarea label="Description" rows={5} {...register("description")} error={errors.description?.message} />
 
       <div className="grid grid-cols-2 gap-3">
+        {/* La vente est fermée pendant le lancement. Le champ reste dans le
+            formulaire — une annonce existante garde son type — mais il
+            n'offre plus que la location : proposer un choix que l'API
+            refuse serait une impasse. Le serveur revalide de toute façon. */}
         <Select label="Type d'offre" {...register("listing_type")}>
           <option value="rent">Location</option>
-          <option value="sale">Vente</option>
         </Select>
         {listingType === "rent" && (
           <Select label="Période" {...register("rental_period")}>

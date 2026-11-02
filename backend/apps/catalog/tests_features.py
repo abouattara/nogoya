@@ -131,7 +131,7 @@ class DynamicAttributeApiTests(APITestCase):
         data = {
             "title": "Berline 2019", "category": self.category.pk,
             "description": "Bonne voiture familiale", "price": "4500000",
-            "listing_type": "sale", "rental_period": "none", "city": "Ouagadougou",
+            "listing_type": "rent", "rental_period": "day", "city": "Ouagadougou",
             "attributes": {"marque": "Toyota", "annee": 2019, "carburant": "Diesel"},
         }
         data.update(over)

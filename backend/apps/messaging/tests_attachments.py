@@ -69,6 +69,10 @@ class ChatAttachmentTests(APITestCase):
             supplier=self.profile, category=self.category, title="Tente",
             price=5000, city="Bobo", status=Product.Status.APPROVED,
         )
+        self.staff = User.objects.create_user(phone="+22670050009", password="pw")
+        self.staff.is_staff = True
+        self.staff.save(update_fields=["is_staff"])
+
         self.client.force_authenticate(self.visitor)
         self.conversation_id = self.client.post(
             reverse("api:conversation-list"), {"product": self.product.pk}
@@ -189,10 +193,25 @@ class ChatAttachmentTests(APITestCase):
         resp = self._post({"body": ""})
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_attachment_notifies_the_recipient(self):
+    def test_a_member_message_notifies_nobody_the_queue_is_the_inbox(self):
+        """Le compte de service ne recoit pas de notification.
+
+        C'est la file de moderation qui sert de boite de reception a
+        l'equipe ; notifier un compte sur lequel personne ne se connecte
+        n'aurait servi a rien.
+        """
         self._post({"images": jpeg_upload()})
-        notification = Notification.objects.get(user=self.supplier_user)
+        self.assertFalse(Notification.objects.exists())
+
+    def test_a_team_answer_notifies_the_member_as_nogoya(self):
+        self.client.force_authenticate(self.staff)
+        self._post({"images": jpeg_upload()})
+
+        notification = Notification.objects.get(user=self.visitor)
         self.assertIn("Photo", notification.message)
+        # Le membre voit NOGOYA, pas le nom de la personne de permanence.
+        self.assertIn("NOGOYA", notification.title)
+        self.assertNotIn(self.staff.phone, notification.title)
 
     # --- access control ---------------------------------------------------
 
@@ -200,8 +219,13 @@ class ChatAttachmentTests(APITestCase):
         resp = self._post({"images": jpeg_upload()})
         url = self._attachment_url(resp.data["id"], resp.data["attachments"][0]["id"])
 
-        self.client.force_authenticate(self.supplier_user)
+        # L'equipe traite le fil : elle doit pouvoir ouvrir la piece jointe.
+        self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get(url).status_code, status.HTTP_200_OK)
+
+        # Le fournisseur n'est plus dans le fil : il ne la voit pas.
+        self.client.force_authenticate(self.supplier_user)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
 
         self.client.force_authenticate(self.outsider)
         self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
