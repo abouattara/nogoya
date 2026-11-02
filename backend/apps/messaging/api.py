@@ -4,6 +4,9 @@ from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+import logging
+
+from apps.core.errors import storage_failure_reason
 from apps.core.parsers import WrappedMultiPartParser
 from rest_framework import mixins, parsers, permissions, renderers, status, viewsets
 from rest_framework.decorators import action
@@ -27,6 +30,9 @@ from .services import get_or_create_conversation, mark_read, participant_filter,
 
 User = get_user_model()
 
+
+
+logger = logging.getLogger("nogoya.messaging")
 
 
 class MediaRenderer(renderers.BaseRenderer):
@@ -118,6 +124,23 @@ class ConversationViewSet(
                     message.sync_type()
             except DjangoValidationError as exc:
                 return Response({"detail": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as exc:
+                # Même défaut que le formulaire d'annonce avant correction :
+                # seule la validation était attrapée, si bien qu'un disque
+                # plein ou un dossier média non inscriptible ressortait en
+                # 500, avec une réponse qui n'était pas du JSON. Le
+                # correspondant voyait un message vide.
+                #
+                # La transaction a déjà été défaite : le message n'existe
+                # pas, et c'est voulu — un message amputé de deux de ses
+                # quatre photos serait pire qu'un envoi refusé.
+                logger.exception(
+                    "Échec d'envoi d'un message dans la conversation %s", conversation.pk
+                )
+                return Response(
+                    {"detail": f"L'envoi a échoué : {storage_failure_reason(exc)}."},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
 
             Conversation.objects.filter(pk=conversation.pk).update(updated_at=timezone.now())
             message = (

@@ -18,6 +18,7 @@ from rest_framework.test import APITestCase
 
 from apps.catalog.models import Category, Product
 from apps.media.models import MessageAttachment
+from apps.messaging.models import Message
 from apps.notifications.models import Notification
 from apps.suppliers.models import SupplierProfile
 
@@ -267,3 +268,47 @@ class ChatAttachmentTests(APITestCase):
         resp = self._post({"images": jpeg_upload()})
         attachment = MessageAttachment.objects.get(pk=resp.data["attachments"][0]["id"])
         self.assertEqual(len(attachment.checksum), 64)
+
+
+class ChatStorageFailureTests(ChatAttachmentTests):
+    """Le chat souffrait du meme defaut que le formulaire d'annonce.
+
+    Seules les erreurs de validation etaient attrapees : un disque plein
+    ressortait en 500, avec une reponse qui n'etait pas du JSON, et le
+    correspondant voyait un message vide.
+    """
+
+    def test_a_full_disk_is_named_instead_of_a_500(self):
+        from unittest.mock import patch
+        from django.core.files.storage import Storage
+        import errno
+
+        plein = OSError(errno.ENOSPC, "No space left on device")
+        with patch.object(Storage, "save", side_effect=plein):
+            resp = self._post({"images": jpeg_upload()})
+
+        self.assertEqual(resp.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("espace disque insuffisant", resp.data["detail"])
+
+    def test_the_message_is_not_half_created_when_storage_fails(self):
+        """Un message ampute de ses photos serait pire qu'un envoi refuse."""
+        from unittest.mock import patch
+        from django.core.files.storage import Storage
+        import errno
+
+        before = Message.objects.count()
+        with patch.object(Storage, "save", side_effect=OSError(errno.EACCES, "denied")):
+            self._post({"body": "Voici les photos", "images": jpeg_upload()})
+
+        self.assertEqual(Message.objects.count(), before)
+
+    def test_the_system_message_itself_never_reaches_the_client(self):
+        from unittest.mock import patch
+        from django.core.files.storage import Storage
+        import errno
+
+        bavard = OSError(errno.ENOSPC, "No space left on device: '/home/binogoya/media'")
+        with patch.object(Storage, "save", side_effect=bavard):
+            resp = self._post({"images": jpeg_upload()})
+
+        self.assertNotIn("/home/binogoya", str(resp.data))
