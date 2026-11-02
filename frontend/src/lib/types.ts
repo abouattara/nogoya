@@ -348,13 +348,16 @@ export interface RentalRequest {
   id: number;
   product: ProductListItem;
   start_date: string;
-  end_date: string;
+  /** Nul quand la duree est indeterminee — un logement, typiquement. */
+  end_date: string | null;
+  open_ended: boolean;
   message: string;
   status: RentalRequestStatus;
   status_label: string;
   /** Vrai une fois que l'equipe a transmis les coordonnees du fournisseur. */
   contact_released: boolean;
-  nights: number;
+  /** Nul quand la duree est indeterminee. */
+  nights: number | null;
   thread: number | null;
   created_at: string;
 }
@@ -364,6 +367,9 @@ export interface StaffRentalRequest extends RentalRequest {
   client_name: string;
   supplier_name: string;
   handled_by_name: string | null;
+  /** Par ou rappeler le demandeur : son compte, ou le numero laisse. */
+  requester_phone: string;
+  has_account: boolean;
   supplier_checked_at: string | null;
   contact_released_at: string | null;
   staff_note: string;

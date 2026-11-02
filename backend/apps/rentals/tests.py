@@ -88,10 +88,119 @@ class RentalRequestFlowTests(APITestCase):
         resp = self._submit(self.supplier)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_an_anonymous_visitor_cannot_submit(self):
+    # --- le visiteur sans compte ---------------------------------------
+
+    def test_a_visitor_without_an_account_may_ask(self):
+        """Exiger une inscription avant la premiere question fait fuir.
+
+        Le schema ne l'impose pas : c'est NOGOYA qui rappelle, et un numero
+        suffit pour cela.
+        """
         self.client.force_authenticate(None)
-        resp = self.client.post(self.list_url, {}, format="json")
-        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+        resp = self.client.post(
+            self.list_url,
+            {
+                "product": self.product.pk,
+                "start_date": self.start.isoformat(),
+                "end_date": self.end.isoformat(),
+                "guest_name": "Awa Traore",
+                "guest_phone": "70 11 22 33",
+                "message": "Disponible ?",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+
+        demande = RentalRequest.objects.get()
+        self.assertIsNone(demande.client_id)
+        # Le numero est normalise a l'enregistrement.
+        self.assertEqual(demande.guest_phone, "70112233")
+        self.assertEqual(demande.requester_label, "Awa Traore")
+        # Sans compte, pas de fil : nous rappellerons.
+        self.assertIsNone(demande.thread_id)
+
+    def test_a_visitor_without_a_phone_is_refused(self):
+        """Sans compte ni numero, la demande serait une impasse."""
+        self.client.force_authenticate(None)
+        resp = self.client.post(
+            self.list_url,
+            {
+                "product": self.product.pk,
+                "start_date": self.start.isoformat(),
+                "end_date": self.end.isoformat(),
+                "guest_name": "Awa",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("guest_phone", resp.data)
+        self.assertFalse(RentalRequest.objects.exists())
+
+    def test_a_signed_in_client_cannot_pass_someone_elses_number(self):
+        resp = self._submit(guest_phone="70999999", guest_name="Quelqu un d autre")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        demande = RentalRequest.objects.get()
+        self.assertEqual(demande.guest_phone, "")
+        self.assertEqual(demande.client, self.client_user)
+
+    def test_a_guest_request_never_lists_itself_to_others(self):
+        self.client.force_authenticate(None)
+        self.client.post(
+            self.list_url,
+            {
+                "product": self.product.pk, "start_date": self.start.isoformat(),
+                "end_date": self.end.isoformat(), "guest_phone": "70112233",
+            },
+            format="json",
+        )
+        self.client.force_authenticate(self.client_user)
+        self.assertEqual(self.client.get(self.list_url).data["count"], 0)
+
+    # --- duree indeterminee ---------------------------------------------
+
+    def test_a_house_may_be_asked_without_an_end_date(self):
+        """Demander une date de fin pour un logement n'a pas de sens."""
+        resp = self._submit(end_date=None, open_ended=True)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+
+        demande = RentalRequest.objects.get()
+        self.assertIsNone(demande.end_date)
+        self.assertTrue(demande.open_ended)
+        self.assertIsNone(demande.nights)
+
+    def test_an_end_date_is_required_unless_the_duration_is_open(self):
+        resp = self._submit(end_date=None)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("end_date", resp.data)
+
+    def test_checking_an_open_duration_drops_any_end_date_given(self):
+        """On efface la date plutot que d'en garder une qui ne veut rien dire."""
+        self._submit(open_ended=True)
+        self.assertIsNone(RentalRequest.objects.get().end_date)
+
+    # --- le recapitulatif dans le fil ------------------------------------
+
+    def test_the_thread_opens_with_a_summary_not_an_empty_chat(self):
+        """L'equipe ouvrait une conversation vide, sans savoir de quoi il s'agit."""
+        from apps.messaging.models import Message
+
+        self._submit()
+        demande = RentalRequest.objects.get()
+        recap = Message.objects.get(conversation=demande.thread)
+
+        self.assertEqual(recap.message_type, Message.Type.SYSTEM)
+        self.assertIn(self.product.title, recap.body)
+        self.assertIn("Bonjour, est-ce libre ?", recap.body)
+        self.assertIn(f"{self.start:%d/%m/%Y}", recap.body)
+        # Lu d'emblee : c'est un recapitulatif, pas une question en attente.
+        self.assertIsNotNone(recap.read_at)
+
+    def test_the_summary_says_when_the_duration_is_open(self):
+        from apps.messaging.models import Message
+
+        self._submit(end_date=None, open_ended=True)
+        recap = Message.objects.get(conversation=RentalRequest.objects.get().thread)
+        self.assertIn("duree indeterminee", recap.body.replace("é", "e"))
 
     # --- le verrou sur les coordonnées ----------------------------------
 

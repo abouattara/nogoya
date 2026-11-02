@@ -24,6 +24,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.accounts.models import phone_validator
 from apps.core.models import TimeStampedModel
 
 
@@ -42,12 +43,36 @@ class RentalRequest(TimeStampedModel):
         "catalog.Product", on_delete=models.CASCADE, related_name="rental_requests",
         verbose_name=_("bien demandé"),
     )
+    # --- qui demande -------------------------------------------------
+    # Le compte est facultatif. Exiger une inscription avant la premiere
+    # question fait fuir une part des clients, et le schema intermedie ne
+    # l'impose pas : c'est NOGOYA qui rappelle, et un numero suffit pour
+    # cela. Un visiteur identifie garde l'avantage de suivre sa demande
+    # dans son espace et d'echanger dans un fil.
     client = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="rental_requests",
-        verbose_name=_("client"),
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
+        related_name="rental_requests", verbose_name=_("client"),
     )
-    start_date = models.DateField(_("du"))
-    end_date = models.DateField(_("au"))
+    guest_name = models.CharField(_("nom du demandeur"), max_length=120, blank=True)
+    guest_phone = models.CharField(
+        _("téléphone du demandeur"), max_length=20, blank=True,
+        validators=[phone_validator],
+        help_text=_("Renseigné quand la demande vient d'un visiteur sans compte."),
+    )
+
+    # --- quand ---------------------------------------------------------
+    start_date = models.DateField(_("à partir du"))
+    end_date = models.DateField(
+        _("jusqu'au"), null=True, blank=True,
+        help_text=_("Vide lorsque la durée n'est pas connue — un logement, typiquement."),
+    )
+    open_ended = models.BooleanField(
+        _("durée indéterminée"), default=False,
+        help_text=_(
+            "Le demandeur ne sait pas encore quand il rendra le bien. "
+            "Demander une date de fin pour une maison n'avait pas de sens."
+        ),
+    )
     message = models.TextField(_("message"), blank=True)
 
     status = models.CharField(
@@ -92,8 +117,17 @@ class RentalRequest(TimeStampedModel):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(end_date__gte=models.F("start_date")),
+                # Une date de fin absente est permise (durée indéterminée) ;
+                # une date de fin anterieure au debut ne l'est jamais.
+                condition=models.Q(end_date__isnull=True)
+                | models.Q(end_date__gte=models.F("start_date")),
                 name="rental_request_dates_ordered",
+            ),
+            models.CheckConstraint(
+                # Sans compte ni numero, personne ne peut etre rappele : la
+                # demande serait une impasse pour tout le monde.
+                condition=~models.Q(client__isnull=True, guest_phone=""),
+                name="rental_request_has_a_way_to_reply",
             ),
         ]
 
@@ -105,6 +139,10 @@ class RentalRequest(TimeStampedModel):
             raise ValidationError(
                 {"end_date": _("La date de fin ne peut pas précéder la date de début.")}
             )
+        if self.client_id is None and not self.guest_phone:
+            raise ValidationError(
+                {"guest_phone": _("Un numéro est nécessaire pour vous recontacter.")}
+            )
 
     @property
     def contact_released(self):
@@ -112,5 +150,19 @@ class RentalRequest(TimeStampedModel):
 
     @property
     def nights(self):
-        """Durée en jours, bornes comprises — ce qu'un loueur appelle la durée."""
+        """Durée en jours, bornes comprises. `None` si elle est inconnue."""
+        if self.end_date is None:
+            return None
         return (self.end_date - self.start_date).days + 1
+
+    @property
+    def requester_label(self):
+        """Comment nommer le demandeur, avec ou sans compte."""
+        if self.client_id:
+            return self.client.public_name("Client")
+        return self.guest_name or "Visiteur"
+
+    @property
+    def requester_phone(self):
+        """Par où le rappeler. C'est tout l'intérêt d'accepter les visiteurs."""
+        return self.client.phone if self.client_id else self.guest_phone

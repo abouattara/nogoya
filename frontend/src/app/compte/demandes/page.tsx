@@ -88,8 +88,11 @@ function RequestList() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={STATUS_TONE[request.status]}>{request.status_label}</Badge>
                     <span className="text-xs text-foreground-muted">
-                      {formatDay(request.start_date)} → {formatDay(request.end_date)} ·{" "}
-                      {request.nights} jour{request.nights > 1 ? "s" : ""}
+                      {/* Une duree indeterminee n'a ni date de fin ni
+                          nombre de jours : l'ecrire « 0 jour » serait faux. */}
+                      {request.end_date
+                        ? `${formatDay(request.start_date)} → ${formatDay(request.end_date)} · ${request.nights} jour${(request.nights ?? 0) > 1 ? "s" : ""}`
+                        : `à partir du ${formatDay(request.start_date)} · durée indéterminée`}
                     </span>
                   </div>
 

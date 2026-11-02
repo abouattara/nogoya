@@ -23,11 +23,14 @@ export function ProductCard({ product }: { product: ProductListItem }) {
         ) : (
           <div className="flex h-full items-center justify-center text-foreground-muted">Pas de photo</div>
         )}
-        <div className="absolute left-2 top-2">
-          <Badge tone={product.listing_type === "rent" ? "brand" : "warning"}>
-            {product.listing_type === "rent" ? "Location" : "Vente"}
-          </Badge>
-        </div>
+        {/* Tout est en location pendant le lancement : l'ecrire sur chaque
+            carte serait du bruit. Une vente, elle, merite d'etre signalee
+            — et le badge reviendra tout seul si la vente rouvre. */}
+        {product.listing_type === "sale" && (
+          <div className="absolute left-2 top-2">
+            <Badge tone="warning">Vente</Badge>
+          </div>
+        )}
         <div className="absolute right-2 top-2">
           <FavoriteButton slug={product.slug} initial={product.is_favorite} />
         </div>

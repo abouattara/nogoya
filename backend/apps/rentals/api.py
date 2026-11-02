@@ -18,6 +18,8 @@ from apps.catalog.models import Product
 from apps.catalog.permissions import IsStaff
 from apps.messaging.services import get_or_create_support_thread
 
+from .notices import announce_request
+
 from .models import RentalRequest
 from .serializers import (
     RentalRequestCreateSerializer,
@@ -35,6 +37,22 @@ class RentalRequestViewSet(
     viewsets.GenericViewSet,
 ):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action == "create":
+            # Exiger une inscription avant la première question fait fuir
+            # une part des clients, et le schéma ne l'impose pas : c'est
+            # NOGOYA qui rappelle, et un numéro suffit. Le serializer exige
+            # ce numéro pour un visiteur sans compte.
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    def get_throttles(self):
+        # Une demande ouverte aux visiteurs est une porte ouverte au bruit :
+        # elle passe par le quota serré, compté par navigateur.
+        if self.action == "create":
+            self.throttle_scope = "auth"
+        return super().get_throttles()
 
     def get_queryset(self):
         base = RentalRequest.objects.select_related(
@@ -57,10 +75,20 @@ class RentalRequestViewSet(
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]
+        user = self.request.user
+
+        if not user.is_authenticated:
+            # Pas de compte, donc pas de fil : nous rappellerons au numéro
+            # laissé. La demande reste visible de l'équipe dans sa file.
+            demande = serializer.save()
+            announce_request(demande)
+            return
+
         # La demande ouvre — ou retrouve — le fil avec NOGOYA sur ce bien :
         # le client n'a pas à chercher où suivre son dossier.
-        thread, _created = get_or_create_support_thread(self.request.user, product=product)
-        serializer.save(client=self.request.user, thread=thread)
+        thread, _created = get_or_create_support_thread(user, product=product)
+        demande = serializer.save(client=user, thread=thread)
+        announce_request(demande)
 
     # --- gestes d'équipe ------------------------------------------------
 

@@ -139,8 +139,14 @@ function ProductsTable() {
               <td className="px-4 py-3">
                 <div className="flex flex-col gap-1">
                   <Badge tone={STATUS_LABEL[product.status].tone}>{STATUS_LABEL[product.status].label}</Badge>
+                  {/* Un loueur ne pense pas « publication » mais
+                      « disponibilité » : c'est le meme interrupteur, dit
+                      dans ses termes. Un bien indisponible quitte le
+                      catalogue et ne recoit plus de demandes. */}
                   {product.status === "approved" && (
-                    <Badge tone={product.is_active ? "brand" : "neutral"}>{product.is_active ? "Publiée" : "Dépubliée"}</Badge>
+                    <Badge tone={product.is_active ? "brand" : "neutral"}>
+                      {product.is_active ? "Disponible" : "Indisponible"}
+                    </Badge>
                   )}
                 </div>
               </td>
@@ -155,7 +161,7 @@ function ProductsTable() {
                   </Link>
                   {product.status === "approved" && (
                     <Button variant="secondary" size="sm" onClick={() => toggleActive(product.slug)}>
-                      {product.is_active ? "Dépublier" : "Publier"}
+                      {product.is_active ? "Marquer indisponible" : "Remettre en ligne"}
                     </Button>
                   )}
                   <Button variant="danger" size="sm" onClick={() => remove(product.slug)}>

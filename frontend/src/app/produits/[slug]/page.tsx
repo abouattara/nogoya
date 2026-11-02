@@ -66,9 +66,9 @@ export default async function ProductDetailPage({ params }: PageProps<"/produits
           <div className="mt-6 flex items-start justify-between gap-4">
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <Badge tone={product.listing_type === "rent" ? "brand" : "warning"}>
-                  {product.listing_type === "rent" ? "Location" : "Vente"}
-                </Badge>
+                {/* Même règle que sur les cartes : on ne signale que
+                    l'exception. Tout est en location au lancement. */}
+                {product.listing_type === "sale" && <Badge tone="warning">Vente</Badge>}
                 {product.category && <Badge>{product.category.name}</Badge>}
               </div>
               <h1 className="text-2xl font-bold">{product.title}</h1>

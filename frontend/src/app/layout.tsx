@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "nogoya — location et vente entre particuliers et pros",
+    default: "nogoya — la location entre particuliers et professionnels",
     template: "%s · nogoya",
   },
   description:
