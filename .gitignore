@@ -24,6 +24,11 @@ backend/imports/*
 **/__pycache__/
 *.py[cod]
 
+# Sorties de curl laissees par un diagnostic (curl -o r, -o g...)
+/backend/r
+/backend/c
+/frontend/g
+
 # Système / éditeurs
 .DS_Store
 Thumbs.db
