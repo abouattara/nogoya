@@ -18,7 +18,11 @@ class RentalRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RentalRequest
-        fields = ["id", "product", "start_date", "end_date", "message"]
+        # `thread` est en lecture seule mais doit sortir : sans lui, le
+        # client venait d'envoyer sa demande et n'avait aucun lien pour la
+        # suivre — l'écran affichait « Toutes mes demandes » faute de mieux.
+        fields = ["id", "product", "start_date", "end_date", "message", "thread", "status"]
+        read_only_fields = ["thread", "status"]
 
     def validate_product(self, value):
         if value.status != Product.Status.APPROVED or not value.is_active:

@@ -7,7 +7,27 @@ from .base import env
 DEBUG = True
 
 # ---------------------------------------------------------------------------
-# Les tests ne dépendent pas d'un Redis vivant
+# Le développement local ne dépend pas d'un Redis vivant
+# ---------------------------------------------------------------------------
+# `base.py` met le cache sur Redis, et la limitation de débit le traverse à
+# *chaque* requête : sans Redis, le serveur de développement répond 500 sur
+# toutes les URL, y compris la page d'accueil. Redis arrive normalement par
+# `docker compose`, mais tout le monde ne fait pas tourner Docker pour
+# relire une page — et lancer le projet ne doit pas réclamer un service
+# qu'on n'a pas installé.
+#
+# Un cache en mémoire suffit en local. Qui veut éprouver le vrai cache
+# partagé met `USE_REDIS_CACHE=True` dans son `.env`.
+if not env.bool("USE_REDIS_CACHE", default=False):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "nogoya-dev",
+        }
+    }
+
+# ---------------------------------------------------------------------------
+# Les tests non plus
 # ---------------------------------------------------------------------------
 # `base.py` met le cache sur Redis, et la limitation de débit traverse le
 # cache à *chaque* requête : sans Redis, la suite entière échoue sur
