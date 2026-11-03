@@ -6,6 +6,7 @@ single seam a smarter engine would replace later.
 """
 from django.db.models import Count, Q
 
+from apps.catalog.queries import public_products
 from apps.catalog.models import Favorite, Product
 
 from .models import ProductView, SearchEvent
@@ -65,8 +66,12 @@ def recent_searches(request, limit=6):
 
 
 def _public_products():
+    # La definition de « public » vit dans catalog.queries : elle a change
+    # trois fois, et chaque fois une requete oubliee a continue de montrer
+    # ce qu'il ne fallait plus — ici, des annonces de vente apres le
+    # passage au lancement « location ».
     return (
-        Product.objects.filter(status=Product.Status.APPROVED, is_active=True)
+        public_products()
         .select_related("category", "supplier__user")
         .prefetch_related("images")
     )

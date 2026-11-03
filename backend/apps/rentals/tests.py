@@ -189,11 +189,42 @@ class RentalRequestFlowTests(APITestCase):
         recap = Message.objects.get(conversation=demande.thread)
 
         self.assertEqual(recap.message_type, Message.Type.SYSTEM)
-        self.assertIn(self.product.title, recap.body)
+        # Le bien est porte par la carte jointe, pas recopie dans le texte :
+        # le lire sans pouvoir l'ouvrir obligeait a le chercher a la main.
+        self.assertEqual(recap.shared_product, self.product)
         self.assertIn("Bonjour, est-ce libre ?", recap.body)
         self.assertIn(f"{self.start:%d/%m/%Y}", recap.body)
         # Lu d'emblee : c'est un recapitulatif, pas une question en attente.
         self.assertIsNotNone(recap.read_at)
+
+    def test_two_requests_from_the_same_client_share_one_thread(self):
+        """Une conversation par personne, pas par demande."""
+        from apps.messaging.models import Conversation, Message
+
+        autre = Product.objects.create(
+            supplier=self.supplier.supplier_profile, category=self.category,
+            title="Studio meuble", price=90000, city="Ouagadougou",
+            status=Product.Status.APPROVED, is_active=True,
+        )
+        self._submit()
+        self._submit(product=autre.pk)
+
+        fils = Conversation.objects.filter(participant_low=self.client_user) |             Conversation.objects.filter(participant_high=self.client_user)
+        self.assertEqual(fils.distinct().count(), 1)
+        # Mais les deux recapitulatifs sont la, chacun avec son annonce.
+        recaps = Message.objects.filter(message_type=Message.Type.SYSTEM)
+        self.assertEqual(recaps.count(), 2)
+        self.assertEqual(
+            {m.shared_product_id for m in recaps}, {self.product.pk, autre.pk}
+        )
+
+    def test_the_summary_carries_the_listing_so_it_is_clickable(self):
+        """Lire le nom du bien sans pouvoir l'ouvrir obligeait a le chercher."""
+        from apps.messaging.models import Message
+
+        self._submit()
+        recap = Message.objects.get(message_type=Message.Type.SYSTEM)
+        self.assertEqual(recap.shared_product, self.product)
 
     def test_the_summary_says_when_the_duration_is_open(self):
         from apps.messaging.models import Message

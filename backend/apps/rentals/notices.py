@@ -26,7 +26,7 @@ def describe_period(demande):
 def summarise(demande):
     """Le texte du récapitulatif, lisible tel quel dans le fil."""
     lignes = [
-        f"Demande de location — {demande.product.title}",
+        "Demande de location",
         f"Période : {describe_period(demande)}",
         f"Demandeur : {demande.requester_label} ({demande.requester_phone or 'sans numéro'})",
     ]
@@ -55,6 +55,11 @@ def announce_request(demande):
             sender=demande.client,
             message_type=Message.Type.SYSTEM,
             body=summarise(demande),
+            # L'annonce est jointe au message, pas seulement nommée dans le
+            # texte : le fil affiche alors sa carte, cliquable, avec sa
+            # photo et son prix. Lire « Demande de location — Moto » sans
+            # pouvoir ouvrir l'annonce obligeait à la chercher à la main.
+            shared_product=demande.product,
             # Lu d'emblée : c'est un récapitulatif, pas une question en
             # attente. Le compter comme non lu gonflerait le badge de
             # l'équipe sans rien lui apprendre de plus que la file.

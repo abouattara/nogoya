@@ -42,11 +42,16 @@ def support_account():
 
 
 def get_or_create_support_thread(member, *, product=None, audience=None):
-    """Le fil entre ce membre et NOGOYA, à propos de ce bien.
+    """**Le** fil entre ce membre et NOGOYA. Un seul, quoi qu'il demande.
 
-    Un fil par annonce, plus un fil général sans annonce : un client qui
-    pose des questions sur trois logements ne doit pas les mélanger, et
-    l'équipe doit voir de quoi on parle sans remonter l'historique.
+    La première version en ouvrait un par annonce. À l'usage c'est pénible
+    des deux côtés : un client qui demande trois biens se retrouvait avec
+    trois conversations, et l'équipe devait suivre la même personne dans
+    plusieurs fils sans jamais voir l'ensemble de ses échanges.
+
+    Le contexte ne disparaît pas pour autant : chaque demande dépose dans
+    le fil un récapitulatif qui nomme le bien et renvoie vers son annonce.
+    C'est le message qui porte le sujet, pas la conversation.
     """
     support = support_account()
     if member.pk == support.pk:
@@ -63,9 +68,13 @@ def get_or_create_support_thread(member, *, product=None, audience=None):
     conversation, created = Conversation.objects.get_or_create(
         participant_low=low,
         participant_high=high,
-        initial_product=product,
-        defaults={"audience": audience},
+        defaults={"audience": audience, "initial_product": product},
     )
+    # `initial_product` garde le premier sujet abordé, utile comme repère
+    # dans la liste ; il n'identifie plus le fil.
+    if created is False and conversation.initial_product_id is None and product is not None:
+        conversation.initial_product = product
+        conversation.save(update_fields=["initial_product", "updated_at"])
     return conversation, created
 
 

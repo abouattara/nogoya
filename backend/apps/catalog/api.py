@@ -19,6 +19,7 @@ from apps.analytics.services import record_contact_event, record_product_view, r
 
 from .filters import ProductFilter, apply_attribute_filters
 from .models import Category, Favorite, Product, ProductImage
+from .queries import public_products
 from .permissions import (
     IsImageOwnerOrReadOnly,
     IsOwnerSupplierOrReadOnly,
@@ -148,12 +149,9 @@ class ProductViewSet(viewsets.ModelViewSet):
             if self.request.query_params.get("mine") == "true" and user.is_authenticated:
                 qs = qs.filter(supplier__user=user)
             else:
-                qs = qs.filter(status=Product.Status.APPROVED, is_active=True)
-                if settings.LAUNCH_RENTAL_ONLY:
-                    # Le lancement ne porte que la location. Les annonces de
-                    # vente deja saisies restent en base et visibles de leur
-                    # proprietaire ; elles sortent seulement du catalogue.
-                    qs = qs.filter(listing_type=Product.ListingType.RENT)
+                # Meme definition que partout ailleurs : voir
+                # catalog/queries.py.
+                qs = qs.filter(pk__in=public_products().values("pk"))
             return apply_attribute_filters(qs, self.request.query_params)
         if self.action == "retrieve":
             qs = qs.prefetch_related("attribute_values__attribute")

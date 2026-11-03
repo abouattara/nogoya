@@ -60,7 +60,13 @@ class MessagingApiTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         self.assertEqual(resp.data["audience"], Conversation.Audience.SUPPLIER)
 
-    def test_one_thread_per_product_so_subjects_do_not_mix(self):
+    def test_a_member_has_exactly_one_thread_whatever_they_ask(self):
+        """Un fil par annonce s'etait revele penible des deux cotes.
+
+        Trois demandes donnaient trois conversations, et l'equipe suivait la
+        meme personne dans plusieurs fils sans jamais voir l'ensemble. Le
+        sujet est desormais porte par les messages, pas par le fil.
+        """
         autre = Product.objects.create(
             supplier=self.profile, category=self.category, title="Chaises",
             price=1000, city="Bobo", status=Product.Status.APPROVED,
@@ -68,8 +74,8 @@ class MessagingApiTests(APITestCase):
         self.client.force_authenticate(self.visitor)
         a = self.client.post(reverse("api:conversation-list"), {"product": self.product.pk})
         b = self.client.post(reverse("api:conversation-list"), {"product": autre.pk})
-        self.assertNotEqual(a.data["id"], b.data["id"])
-        self.assertEqual(Conversation.objects.count(), 2)
+        self.assertEqual(a.data["id"], b.data["id"])
+        self.assertEqual(Conversation.objects.count(), 1)
 
     def test_the_team_sees_every_thread_and_answers_as_nogoya(self):
         conv_id = self._start_conversation(self.visitor).data["id"]

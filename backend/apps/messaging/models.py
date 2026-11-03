@@ -48,19 +48,14 @@ class Conversation(TimeStampedModel):
 
     class Meta:
         constraints = [
-            # Un fil par annonce, et un fil général sans annonce. Les deux
-            # contraintes sont nécessaires : une contrainte unique traite
-            # deux NULL comme distincts, donc la première seule laisserait
-            # créer autant de fils généraux qu'on veut.
-            models.UniqueConstraint(
-                fields=["participant_low", "participant_high", "initial_product"],
-                condition=models.Q(initial_product__isnull=False),
-                name="unique_thread_per_pair_and_product",
-            ),
+            # Un seul fil par membre. Un fil par annonce s'etait revele
+            # penible des deux cotes : trois demandes donnaient trois
+            # conversations, et l'equipe suivait la meme personne dans
+            # plusieurs fils sans voir l'ensemble. Le sujet est porte par
+            # les messages, pas par la conversation.
             models.UniqueConstraint(
                 fields=["participant_low", "participant_high"],
-                condition=models.Q(initial_product__isnull=True),
-                name="unique_general_thread_per_pair",
+                name="unique_conversation_pair",
             ),
         ]
         ordering = ["-updated_at"]

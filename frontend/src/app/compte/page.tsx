@@ -66,9 +66,14 @@ function ModerationLink() {
   });
   if (!me?.is_staff) return null;
   return (
-    <ButtonLink href="/compte/moderation" variant="secondary">
-      Modération
-    </ButtonLink>
+    <>
+      <ButtonLink href="/compte/demandes-recues" variant="secondary">
+        Demandes reçues
+      </ButtonLink>
+      <ButtonLink href="/compte/moderation" variant="secondary">
+        Modération
+      </ButtonLink>
+    </>
   );
 }
 
