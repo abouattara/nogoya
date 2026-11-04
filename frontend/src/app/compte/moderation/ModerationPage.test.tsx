@@ -54,10 +54,17 @@ describe("Page de modération", () => {
   it("demande par défaut les annonces qui attendent une décision", async () => {
     renderWithProviders(<ModerationPage />);
 
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    const url = String(apiFetch.mock.calls[0][0]);
-    expect(url).toContain("status=pending");
-    expect(url).toContain("status=draft");
+    // La page appelle aussi le compteur des demandes en attente : on
+    // cherche l'appel de la file, pas « le premier ».
+    await waitFor(() => {
+      const appel = apiFetch.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes("/moderation/")
+      );
+      expect(appel).toBeTruthy();
+      const url = String(appel![0]);
+      expect(url).toContain("status=pending");
+      expect(url).toContain("status=draft");
+    });
   });
 
   it("affiche toutes les photos, pas seulement la couverture", async () => {

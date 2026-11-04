@@ -24,10 +24,16 @@ backend/imports/*
 **/__pycache__/
 *.py[cod]
 
-# Sorties de curl laissees par un diagnostic (curl -o r, -o g...)
-/backend/r
-/backend/c
-/frontend/g
+# Sorties de curl laissees par un diagnostic (curl -o r, -o g.json...).
+# Un nom d'un ou deux caracteres a la racine d'un module n'est jamais un
+# fichier du projet : trois fois qu'ils se faufilent dans un commit.
+/backend/?
+/backend/??
+/backend/?.json
+/backend/??.json
+/frontend/?
+/frontend/??
+/frontend/?.json
 
 # Système / éditeurs
 .DS_Store
