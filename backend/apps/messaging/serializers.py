@@ -92,17 +92,36 @@ class ConversationSerializer(serializers.ModelSerializer):
             return UserPublicSerializer(member, context=self.context).data
         return UserPublicSerializer(support_account(), context=self.context).data
 
+    def _voice_of(self, request):
+        """Sous quelle identité ce lecteur écrit dans le fil.
+
+        L'équipe répond au nom du compte de service, pas du sien. Comparer
+        au seul `request.user` revenait à dire qu'aucun message n'était
+        d'elle : ses propres réponses rentraient dans son compteur de non
+        lus, et l'aperçu du fil perdait son « Vous : ». Le fil remontait
+        donc en tête avec une pastille, pour une phrase qu'elle venait
+        d'écrire.
+        """
+        if not request or not request.user.is_authenticated:
+            return None
+        return support_account().pk if request.user.is_staff else request.user.id
+
     def get_last_message(self, obj):
         last = obj.messages.order_by("-created_at").first()
         if not last:
             return None
         preview = TYPE_PREVIEW.get(last.message_type) or last.body or ""
+        voice = self._voice_of(self.context.get("request"))
         return {
             "body": preview,
             "created_at": last.created_at,
-            "is_mine": self.context["request"].user.id == last.sender_id,
+            # Une note de service n'est de personne : elle ne prend pas le
+            # « Vous : » de celui qui la lit.
+            "is_mine": last.message_type != Message.Type.SYSTEM and last.sender_id == voice,
         }
 
     def get_unread_count(self, obj):
-        request = self.context.get("request")
-        return obj.messages.filter(read_at__isnull=True).exclude(sender=request.user).count()
+        voice = self._voice_of(self.context.get("request"))
+        if voice is None:
+            return 0
+        return obj.messages.filter(read_at__isnull=True).exclude(sender_id=voice).count()

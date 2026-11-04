@@ -52,3 +52,46 @@ export function formatDuration(totalSeconds: number) {
   const seconds = safe % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+
+/** "14:32" — l'heure seule, ce qu'une bulle de chat porte. */
+export function formatTime(iso: string) {
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
+/**
+ * Le titre d'une journée de conversation : « Aujourd'hui », « Hier »,
+ * « lundi 3 novembre », puis l'année dès qu'on en sort.
+ *
+ * La comparaison porte sur la date civile, pas sur un écart en heures :
+ * à 00 h 10, un message de 23 h 50 est d'hier, même s'il a vingt minutes.
+ */
+export function formatDayLabel(iso: string, now: Date = new Date()) {
+  const date = new Date(iso);
+  const atMidnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((atMidnight(now) - atMidnight(date)) / 86_400_000);
+
+  if (days === 0) return "Aujourd'hui";
+  if (days === 1) return "Hier";
+  if (days < 7) {
+    return new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(date);
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
+/** Deux messages se collent-ils en un seul bloc ? */
+export function sameMessageGroup(
+  previous: { is_mine: boolean; created_at: string } | undefined,
+  current: { is_mine: boolean; created_at: string }
+) {
+  if (!previous) return false;
+  if (previous.is_mine !== current.is_mine) return false;
+  const gap = new Date(current.created_at).getTime() - new Date(previous.created_at).getTime();
+  // Cinq minutes : au-delà, l'interlocuteur est reparti et revenu, et
+  // coller les bulles ferait perdre cette respiration.
+  return gap >= 0 && gap < 5 * 60_000;
+}

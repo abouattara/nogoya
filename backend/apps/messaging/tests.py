@@ -161,6 +161,38 @@ class MessagingApiTests(APITestCase):
         self.assertTrue(vu_par_membre["Bonjour"])
         self.assertFalse(vu_par_membre["Nous verifions."])
 
+    def test_the_team_does_not_count_its_own_answers_as_unread(self):
+        """Le meme travers que la couleur des bulles, dans la liste des fils.
+
+        L'equipe repond au nom de NOGOYA : exclure `request.user` du
+        compteur n'excluait donc rien. Chaque reponse qu'elle venait
+        d'ecrire faisait remonter le fil en tete avec une pastille rouge,
+        et l'apercu perdait son « Vous : » — comme si le membre avait
+        repondu a sa place.
+        """
+        conv_id = self._start_conversation(self.visitor).data["id"]
+        self.client.post(
+            reverse("api:conversation-messages", args=[conv_id]), {"body": "Bonjour"}
+        )
+
+        self.client.force_authenticate(self.staff)
+        # L'equipe ouvre le fil, puis repond.
+        self.client.post(reverse("api:conversation-read", args=[conv_id]))
+        self.client.post(
+            reverse("api:conversation-messages", args=[conv_id]), {"body": "Nous verifions."}
+        )
+
+        fil = self.client.get(reverse("api:conversation-list")).data["results"][0]
+        self.assertEqual(fil["unread_count"], 0)
+        self.assertEqual(fil["last_message"]["body"], "Nous verifions.")
+        self.assertTrue(fil["last_message"]["is_mine"])
+
+        # Et cote membre, la meme reponse est bien un message non lu.
+        self.client.force_authenticate(self.visitor)
+        fil_membre = self.client.get(reverse("api:conversation-list")).data["results"][0]
+        self.assertEqual(fil_membre["unread_count"], 1)
+        self.assertFalse(fil_membre["last_message"]["is_mine"])
+
     def test_an_anonymous_reader_owns_nothing(self):
         conv_id = self._start_conversation(self.visitor).data["id"]
         self.client.post(

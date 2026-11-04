@@ -16,7 +16,14 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    // L'identifiant sert a la messagerie, qui mesure cette hauteur pour
+    // caler sa fenetre : elle change d'une rangee a deux selon la largeur,
+    // et toute valeur ecrite en dur y poussait le champ de saisie hors de
+    // l'ecran sur telephone.
+    <header
+      id="site-header"
+      className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur"
+    >
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         {/* La lettre du logo, puis le nom en texte.
             L'image porte l'identite — le degrade du ruban ne se refait pas
