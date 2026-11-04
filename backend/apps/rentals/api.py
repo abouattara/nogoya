@@ -90,6 +90,27 @@ class RentalRequestViewSet(
         demande = serializer.save(client=user, thread=thread)
         announce_request(demande)
 
+    @action(
+        detail=False, methods=["get"], url_path="pending-summary",
+        permission_classes=[permissions.IsAuthenticated, IsStaff],
+    )
+    def pending_summary(self, request):
+        """Combien de demandes attendent, et combien sans compte.
+
+        Une demande d'un visiteur sans compte n'a pas de fil : elle
+        n'apparaît dans aucune conversation, et personne ne relancera si
+        l'équipe l'oublie. Ce compteur sert à l'afficher là où l'équipe
+        regarde déjà — la messagerie et la modération — plutôt que de
+        compter sur elle pour penser à ouvrir un troisième écran.
+        """
+        en_attente = RentalRequest.objects.filter(
+            status__in=[RentalRequest.Status.SUBMITTED, RentalRequest.Status.CHECKING]
+        )
+        return Response({
+            "pending": en_attente.count(),
+            "without_account": en_attente.filter(client__isnull=True).count(),
+        })
+
     # --- gestes d'équipe ------------------------------------------------
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated, IsStaff])

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Badge, EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
+import { PendingRequestsBanner } from "@/components/messaging/PendingRequestsBanner";
 import { RequireAuth } from "@/components/providers/RequireAuth";
 import { apiFetch, ApiError } from "@/lib/client-api";
 import { formatPrice, rentalPeriodLabel } from "@/lib/format";
@@ -144,6 +145,8 @@ function ModerationQueue() {
           ← Mon compte
         </Link>
       </div>
+
+      <PendingRequestsBanner />
 
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Files de modération">
         {QUEUES.map((item) => (

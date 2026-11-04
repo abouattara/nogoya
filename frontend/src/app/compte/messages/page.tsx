@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Badge, EmptyState, ErrorState, Skeleton } from "@/components/ui/Feedback";
 import { RequireAuth } from "@/components/providers/RequireAuth";
 import { apiFetch } from "@/lib/client-api";
+import { PendingRequestsBanner } from "@/components/messaging/PendingRequestsBanner";
 import { formatDate } from "@/lib/format";
 import type { ConversationSummary, Paginated } from "@/lib/types";
 
@@ -23,6 +24,17 @@ export default function MessagesPage() {
 }
 
 function ConversationList() {
+  return (
+    <>
+      {/* Pose avant la liste : une messagerie vide est precisement le cas
+          ou l'equipe doit etre prevenue qu'il reste des demandes. */}
+      <PendingRequestsBanner />
+      <Conversations />
+    </>
+  );
+}
+
+function Conversations() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["conversations"],
     queryFn: () => apiFetch<Paginated<ConversationSummary>>("/api/v1/conversations/"),

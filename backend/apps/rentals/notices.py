@@ -25,8 +25,9 @@ def describe_period(demande):
 
 def summarise(demande):
     """Le texte du récapitulatif, lisible tel quel dans le fil."""
+    # Pas de titre ici : le fil encadre la note et l'intitule lui-meme.
+    # Le repeter donnait « Demande de location / Demande de location ».
     lignes = [
-        "Demande de location",
         f"Période : {describe_period(demande)}",
         f"Demandeur : {demande.requester_label} ({demande.requester_phone or 'sans numéro'})",
     ]

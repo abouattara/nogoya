@@ -125,6 +125,76 @@ class MessagingApiTests(APITestCase):
         unread_after = self.client.get(reverse("api:conversation-unread-count"))
         self.assertEqual(unread_after.data["unread_count"], 0)
 
+    def test_each_side_sees_its_own_messages_as_its_own(self):
+        """Les reponses de l'equipe partent au nom de NOGOYA.
+
+        Comparer au seul `request.user` rendait donc TOUS les messages
+        « pas de moi » cote equipe — ses propres reponses comme celles du
+        membre — et la conversation s'affichait d'une seule couleur, alors
+        que cote membre la meme conversation paraissait normale.
+        """
+        conv_id = self._start_conversation(self.visitor).data["id"]
+        self.client.post(
+            reverse("api:conversation-messages", args=[conv_id]), {"body": "Bonjour"}
+        )
+        self.client.force_authenticate(self.staff)
+        self.client.post(
+            reverse("api:conversation-messages", args=[conv_id]), {"body": "Nous verifions."}
+        )
+
+        vu_par_equipe = {
+            m["body"]: m["is_mine"]
+            for m in self.client.get(
+                reverse("api:conversation-messages", args=[conv_id])
+            ).data["results"]
+        }
+        self.assertFalse(vu_par_equipe["Bonjour"])
+        self.assertTrue(vu_par_equipe["Nous verifions."])
+
+        self.client.force_authenticate(self.visitor)
+        vu_par_membre = {
+            m["body"]: m["is_mine"]
+            for m in self.client.get(
+                reverse("api:conversation-messages", args=[conv_id])
+            ).data["results"]
+        }
+        self.assertTrue(vu_par_membre["Bonjour"])
+        self.assertFalse(vu_par_membre["Nous verifions."])
+
+    def test_an_anonymous_reader_owns_nothing(self):
+        conv_id = self._start_conversation(self.visitor).data["id"]
+        self.client.post(
+            reverse("api:conversation-messages", args=[conv_id]), {"body": "Bonjour"}
+        )
+        self.client.force_authenticate(None)
+        resp = self.client.get(reverse("api:conversation-messages", args=[conv_id]))
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_a_system_note_belongs_to_nobody(self):
+        """Le recapitulatif d'une demande n'est pas un message du client.
+
+        L'attribuer le faisait passer pour quelque chose qu'il aurait
+        ecrit, des deux cotes de la conversation.
+        """
+        from .models import Message
+
+        conv_id = self._start_conversation(self.visitor).data["id"]
+        Message.objects.create(
+            conversation_id=conv_id, sender=self.visitor,
+            message_type=Message.Type.SYSTEM, body="Demande de location",
+        )
+
+        for lecteur in (self.visitor, self.staff):
+            with self.subTest(lecteur=lecteur.phone):
+                self.client.force_authenticate(lecteur)
+                note = next(
+                    m for m in self.client.get(
+                        reverse("api:conversation-messages", args=[conv_id])
+                    ).data["results"]
+                    if m["message_type"] == "system"
+                )
+                self.assertFalse(note["is_mine"])
+
     def test_message_requires_body_or_product(self):
         conv_id = self._start_conversation(self.visitor).data["id"]
         resp = self.client.post(reverse("api:conversation-messages", args=[conv_id]), {})

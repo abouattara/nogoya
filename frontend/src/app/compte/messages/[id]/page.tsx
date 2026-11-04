@@ -167,7 +167,25 @@ function Thread({ conversationId }: { conversationId: string }) {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto py-4">
-        {messages.map((msg) => (
+        {messages.map((msg) =>
+          /* Une note de service — le recapitulatif d'une demande — n'est
+             ni de l'un ni de l'autre. L'afficher en bulle la faisait
+             passer pour un message ecrit par le client ; elle est donc
+             centree, encadree, et porte son titre. */
+          msg.message_type === "system" ? (
+            <div key={msg.id} className="flex flex-col items-center">
+              <div className="w-full max-w-[90%] rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-brand-700">
+                  Demande de location
+                </p>
+                {msg.body && <p className="whitespace-pre-line">{msg.body}</p>}
+                {msg.shared_product && <SharedProductCard product={msg.shared_product} />}
+              </div>
+              <span className="mt-0.5 text-[11px] text-foreground-muted">
+                {formatDate(msg.created_at)}
+              </span>
+            </div>
+          ) : (
           <div key={msg.id} className={clsx("flex flex-col", msg.is_mine ? "items-end" : "items-start")}>
             <div
               className={clsx(
@@ -185,7 +203,8 @@ function Thread({ conversationId }: { conversationId: string }) {
             </div>
             <span className="mt-0.5 text-[11px] text-foreground-muted">{formatDate(msg.created_at)}</span>
           </div>
-        ))}
+          )
+        )}
         <div ref={bottomRef} />
       </div>
 

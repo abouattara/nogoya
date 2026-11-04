@@ -31,8 +31,26 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = ["conversation", "sender", "created_at", "read_at"]
 
     def get_is_mine(self, obj):
+        """Ce message est-il de celui qui lit ?
+
+        Pour un membre, la question est simple. Pour l'équipe, non : ses
+        réponses partent au nom du compte de service, pas du sien. Comparer
+        au seul `request.user` rendait donc **tous** les messages « pas de
+        moi » côté équipe — ses propres réponses comme celles du membre —
+        et la conversation s'affichait d'une seule couleur, illisible.
+        Côté membre, la même conversation paraissait normale.
+        """
         request = self.context.get("request")
-        return bool(request and obj.sender_id == request.user.id)
+        if not request or not request.user.is_authenticated:
+            return False
+        # Une note de service n'appartient à personne : l'attribuer au
+        # client faisait passer le récapitulatif d'une demande pour un
+        # message qu'il aurait écrit.
+        if obj.message_type == Message.Type.SYSTEM:
+            return False
+        if request.user.is_staff:
+            return obj.sender_id == support_account().pk
+        return obj.sender_id == request.user.id
 
 
 class MessageCreateSerializer(serializers.ModelSerializer):

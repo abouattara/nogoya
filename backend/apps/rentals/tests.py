@@ -335,6 +335,48 @@ class RentalRequestFlowTests(APITestCase):
         demande.refresh_from_db()
         self.assertEqual(demande.status, RentalRequest.Status.CANCELLED)
 
+    def test_the_team_is_told_how_many_requests_have_no_account(self):
+        """Personne ne relancera a la place d'un visiteur anonyme.
+
+        Sans fil, ces demandes n'apparaissent dans aucune conversation :
+        le compteur est ce qui les rend visibles la ou l'equipe regarde.
+        """
+        self._submit()
+        self.client.force_authenticate(None)
+        self.client.post(
+            self.list_url,
+            {
+                "product": self.product.pk, "start_date": self.start.isoformat(),
+                "end_date": self.end.isoformat(), "guest_phone": "70112233",
+            },
+            format="json",
+        )
+
+        self.client.force_authenticate(self.staff)
+        data = self.client.get(reverse("api:rental-request-pending-summary")).data
+        self.assertEqual(data["pending"], 2)
+        self.assertEqual(data["without_account"], 1)
+
+    def test_a_treated_request_leaves_the_counter(self):
+        self._submit()
+        demande = RentalRequest.objects.get()
+        self.client.force_authenticate(self.staff)
+        self.client.post(reverse("api:rental-request-available", args=[demande.pk]))
+
+        data = self.client.get(reverse("api:rental-request-pending-summary")).data
+        self.assertEqual(data["pending"], 0)
+
+    def test_the_counter_is_closed_to_everyone_else(self):
+        self._submit()
+        for who in (None, self.client_user, self.supplier):
+            with self.subTest(who=getattr(who, "phone", "anonyme")):
+                self.client.force_authenticate(who)
+                resp = self.client.get(reverse("api:rental-request-pending-summary"))
+                self.assertIn(
+                    resp.status_code,
+                    (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+                )
+
     # --- ce que chacun lit ----------------------------------------------
 
     def test_a_client_sees_only_their_own_requests(self):
