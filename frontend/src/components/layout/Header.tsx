@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { ButtonLink } from "@/components/ui/Button";
@@ -17,16 +18,29 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-        {/* Le mot-repere du logo : capitales, indigo, et le degrade du
-            ruban sur la lettre d'attaque. Pas d'image : un texte reste net
-            a toute taille, se lit par les moteurs de recherche et ne coute
-            aucune requete. */}
+        {/* La lettre du logo, puis le nom en texte.
+            L'image porte l'identite — le degrade du ruban ne se refait pas
+            en CSS sans trahir ses courbes — et le nom reste du texte : net
+            a toute taille, lu par les moteurs de recherche, et toujours la
+            si l'image ne charge pas. Le `alt` est vide parce que le lien
+            porte deja son intitule : un lecteur d'ecran annoncerait sinon
+            « BINOGOYA BINOGOYA ». */}
         <Link
           href="/"
           aria-label="BINOGOYA, accueil"
-          className="shrink-0 text-xl font-extrabold tracking-tight text-brand-600"
+          className="flex shrink-0 items-center gap-2"
         >
-          <span className="text-gradient-brand">B</span>INOGOYA
+          <Image
+            src="/logo-binogoya-96.png"
+            alt=""
+            width={88}
+            height={96}
+            priority
+            className="h-8 w-auto"
+          />
+          <span className="hidden text-xl font-extrabold tracking-tight text-brand-600 sm:inline">
+            BINOGOYA
+          </span>
         </Link>
 
         <div className="hidden flex-1 md:flex">

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/Button";
 
@@ -20,7 +21,21 @@ export default async function HomePage() {
           blanc — illisibles. Le ruban reste donc decoratif, en liseré bas,
           et le texte repose sur l'indigo (12,3:1). */}
       <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-6 py-14 text-center">
-        <div className="flex flex-col items-center gap-6">
+        {/* La lettre en filigrane, large et debordante. Elle est purement
+            decorative — le nom est deja dans le titre de la page et dans
+            l'en-tete — donc `aria-hidden` : la repeter n'apprendrait rien
+            a un lecteur d'ecran. L'opacite la garde en fond sans jamais
+            disputer le contraste du texte, qui reste a 12,3:1. */}
+        <Image
+          src="/logo-binogoya.png"
+          alt=""
+          width={305}
+          height={334}
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 -top-10 h-[130%] w-auto opacity-15 select-none"
+        />
+
+        <div className="relative flex flex-col items-center gap-6">
           <h1 className="max-w-2xl text-3xl font-bold text-white sm:text-4xl">
             Louez ce dont vous avez besoin, auprès de particuliers et de professionnels
           </h1>
