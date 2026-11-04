@@ -97,9 +97,32 @@ CDN devant le préfixe public
   (`SupplierPublicSerializer.get_phone`) que si la requête est authentifiée
   — jamais aux visiteurs anonymes/robots.
 
-## Design System (audit du 2026-09-22)
+## Design System (refonte du 2026-11-04 sur le logo BINOGOYA)
 
-**Décision : thème unique violet + blanc, pas de dark-mode automatique.**
+**Les couleurs sont échantillonnées dans le logo, pas estimées.** L'indigo
+`#312A73` est celui du mot-repère : c'est la couleur d'identité, elle ne se
+dérive pas. Le corail `#E75267` et l'orange `#F77C5D` sont les extrémités
+chaudes du ruban qui forme le « B ».
+
+| Rôle | Jeton | Valeur |
+| --- | --- | --- |
+| Primaire | `--brand-600` | `#312A73` (logo) |
+| Survol | `--brand-700` | `#29235F` |
+| Accent | `--accent-500` | `#E75267` (logo) |
+| Accent portant du texte | `--accent-600` | `#D23A52` |
+| Ruban | `--gradient-brand` | indigo → bleu → corail → orange |
+
+**Le ruban complet ne porte jamais de texte.** Mesuré : du blanc sur le
+corail donne 3,6:1 et sur l'orange 2,6:1 — illisible. Il sert donc de
+liseré et d'aplat décoratif ; les fonds porteurs de texte restent l'indigo
+(blanc dessus : 12,3:1) ou le blanc. Même raison pour `--accent-500`, qui
+ne doit jamais recevoir de texte blanc : c'est `--accent-600` (4,7:1).
+
+Toutes les paires réellement employées ont été calculées avant d'écrire la
+palette ; aucune n'est sous le seuil AA, et celle qui l'était a été écartée
+plutôt qu'arrondie.
+
+**Décision conservée : thème unique, pas de dark-mode automatique.**
 Un audit contraste a révélé que `prefers-color-scheme: dark` combiné à des
 champs `bg-transparent`/sans `color-scheme` explicite pouvait laisser le
 navigateur (mode sombre forcé par l'OS) réinterpréter les `<select>`/

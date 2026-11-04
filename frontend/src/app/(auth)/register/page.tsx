@@ -63,7 +63,7 @@ export default function RegisterPage() {
       <h1 className="mb-6 text-2xl font-bold">Créer un compte</h1>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <Select label="Je suis..." {...register("role")}>
-          <option value="visitor">Un particulier qui cherche à louer/acheter</option>
+          <option value="visitor">Un particulier qui cherche à louer</option>
           <option value="supplier">Un fournisseur qui veut publier des articles</option>
         </Select>
         <div className="grid grid-cols-2 gap-3">

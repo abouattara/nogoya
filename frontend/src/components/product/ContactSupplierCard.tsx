@@ -67,7 +67,7 @@ export function ContactSupplierCard({ slug, productId, supplier, productTitle }:
         body: JSON.stringify({ channel: "whatsapp" }),
       }).catch(() => undefined); // best-effort logging; never block the redirect
     }
-    const message = `Bonjour, je suis intéressé(e) par "${productTitle}" sur nogoya.`;
+    const message = `Bonjour, je suis intéressé(e) par "${productTitle}" sur BINOGOYA.`;
     const number = (supplier.whatsapp_number ?? "").replace(/\D/g, "");
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
   }

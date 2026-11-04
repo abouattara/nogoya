@@ -17,8 +17,16 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-        <Link href="/" className="shrink-0 text-xl font-bold text-brand-dark">
-          nogoya
+        {/* Le mot-repere du logo : capitales, indigo, et le degrade du
+            ruban sur la lettre d'attaque. Pas d'image : un texte reste net
+            a toute taille, se lit par les moteurs de recherche et ne coute
+            aucune requete. */}
+        <Link
+          href="/"
+          aria-label="BINOGOYA, accueil"
+          className="shrink-0 text-xl font-extrabold tracking-tight text-brand-600"
+        >
+          <span className="text-gradient-brand">B</span>INOGOYA
         </Link>
 
         <div className="hidden flex-1 md:flex">

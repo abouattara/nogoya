@@ -1,42 +1,78 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — single light theme (violet + white), inherited from
- * NOG-PROG's violet/white identity (#9b4dca / #6a0dad) and modernised into
- * a full violet scale. See ARCHITECTURE.md "Design System" for the
- * rationale: dark-mode auto-switching was removed because it was the root
- * cause of invisible-text bugs on native form controls (select/option),
- * which the browser can silently re-theme with OS dark mode unless
- * `color-scheme` is explicitly pinned. One fully-specified theme beats two
- * half-audited ones.
+ * Jetons de design — thème clair unique, bâti sur le logo BINOGOYA.
+ *
+ * Les couleurs sont échantillonnées dans le logo, pas estimées à l'œil :
+ * l'indigo #312A73 est celui du mot-repère, donc la couleur d'identité ;
+ * le corail #E75267 et l'orange #F77C5D sont les extrémités chaudes du
+ * ruban. Le dégradé qui forme le « B » devient la signature visuelle.
+ *
+ * Deux règles tenues dans ce fichier, et la première a coûté un vrai bug :
+ *
+ * 1. **Un seul thème, entièrement spécifié.** Le basculement automatique
+ *    en sombre a été retiré : il rendait invisible le texte des contrôles
+ *    natifs (select/option) que le navigateur reteinte tout seul dès que
+ *    le système passe en sombre. Un thème complet vaut mieux que deux à
+ *    moitié vérifiés. Voir ARCHITECTURE.md « Design System ».
+ *
+ * 2. **Chaque paire texte/fond est mesurée.** Les contrastes WCAG ont été
+ *    calculés sur les paires réellement employées. Une seule échoue, et
+ *    elle est signalée là où elle se trouve : `--accent-500` ne porte
+ *    jamais de texte blanc (3,6:1). Pour un bouton, c'est `--accent-600`
+ *    (4,7:1).
  */
 :root {
   color-scheme: light;
 
-  /* Violet brand scale (Tailwind "violet" lineage, closest modern
-     equivalent to NOG-PROG's #9b4dca/#6a0dad/#7a37a3). */
-  --brand-50: #f5f3ff;
-  --brand-100: #ede9fe;
-  --brand-200: #ddd6fe;
-  --brand-300: #c4b5fd;
-  --brand-400: #a78bfa;
-  --brand-500: #8b5cf6;
-  --brand-600: #7c3aed; /* primary */
-  --brand-700: #6d28d9; /* hover / pressed */
-  --brand-800: #5b21b6;
-  --brand-900: #4c1d95;
+  /* Indigo du logo. Le 600 est exactement la couleur du mot-repère :
+     c'est l'identité, elle ne se dérive pas. */
+  --brand-50: #f3f2fa;
+  --brand-100: #e5e3f4;
+  --brand-200: #c9c5e8;
+  --brand-300: #a49ed6;
+  --brand-400: #7b73be;
+  --brand-500: #574ea1;
+  --brand-600: #312a73; /* primaire — blanc dessus : 12,3:1 */
+  --brand-700: #29235f; /* survol / pressé — 14,0:1 */
+  --brand-800: #1f1a4a;
+  --brand-900: #161236;
 
-  /* Surfaces & text — white is the primary surface everywhere. */
+  /* Corail du ruban. Accent, jamais structure : il sert aux points
+     d'attention et au dégradé, pas aux fonds porteurs de texte. */
+  --accent-50: #fef1f2;
+  --accent-100: #fde2e5;
+  --accent-200: #fac4cb;
+  --accent-300: #f59aa6;
+  --accent-400: #ef7080;
+  --accent-500: #e75267; /* couleur du logo — PAS de texte blanc dessus */
+  --accent-600: #d23a52; /* le seul corail qui porte du blanc (4,7:1) */
+  --accent-700: #ae2c41;
+  --accent-800: #8a2434;
+  --accent-900: #6b1c28;
+
+  /* Le ruban du logo, réutilisable : en-tête, bannières, aplats. */
+  --gradient-brand: linear-gradient(
+    120deg,
+    #312a73 0%,
+    #3a4a9e 28%,
+    #e75267 72%,
+    #f77c5d 100%
+  );
+
+  /* Surfaces et texte — le blanc reste la surface principale. */
   --background: #ffffff;
   --surface: #ffffff;
   --surface-muted: var(--brand-50);
   --surface-hover: var(--brand-100);
-  --foreground: #1e1b2e; /* near-black with a violet undertone */
-  --foreground-muted: #5b5470; /* secondary text, 4.5:1+ on white/brand-50 */
-  --border: #e4e0f0; /* violet-tinted neutral border */
+  --foreground: #1c1a33; /* presque noir, sous-teinte indigo — 16,9:1 */
+  --foreground-muted: #565073; /* texte secondaire — 7,5:1 sur blanc */
+  --border: #e3e0f1;
   --border-strong: var(--brand-300);
 
-  /* Semantic states — each with its own readable pair. */
+  /* États sémantiques. Le rouge d'erreur reste distinct du corail
+     d'accent : deux rouges voisins pour « attention » et « action »
+     tromperaient, donc l'accent ne sert jamais à une alerte. */
   --success-bg: #dcfce7;
   --success-fg: #166534;
   --warning-bg: #fef3c7;
@@ -71,6 +107,17 @@
   --color-brand-700: var(--brand-700);
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+
   /* Back-compat alias used by earlier components. */
   --color-brand: var(--brand-600);
   --color-brand-dark: var(--brand-700);
@@ -120,4 +167,17 @@ textarea {
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* Le ruban du logo, à poser sur un en-tête ou une bannière. */
+.bg-gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+/* Le mot-repère, quand il doit reprendre le dégradé du logo. */
+.text-gradient-brand {
+  background-image: var(--gradient-brand);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }

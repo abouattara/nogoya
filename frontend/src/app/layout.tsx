@@ -17,11 +17,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "nogoya — la location entre particuliers et professionnels",
-    template: "%s · nogoya",
+    default: "BINOGOYA — la location entre particuliers et professionnels",
+    template: "%s · BINOGOYA",
   },
   description:
-    "Trouvez et louez véhicules, logements, équipements, outils et bien plus, ou publiez vos propres articles sur nogoya.",
+    "Trouvez et louez véhicules, logements, équipements, outils et bien plus, ou publiez vos propres annonces sur BINOGOYA.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
