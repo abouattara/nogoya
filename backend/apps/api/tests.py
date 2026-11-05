@@ -35,6 +35,7 @@ class AuthApiTests(APITestCase):
             "role": "visitor",
             "password": "UnMotDePasseSolide9",
             "password2": "UnMotDePasseSolide9",
+            "accept_terms": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         user = User.objects.get(phone="+22670001111")
@@ -49,6 +50,7 @@ class AuthApiTests(APITestCase):
             "role": "supplier",
             "password": "UnMotDePasseSolide9",
             "password2": "UnMotDePasseSolide9",
+            "accept_terms": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         user = User.objects.get(phone="+22670001112")
@@ -58,6 +60,7 @@ class AuthApiTests(APITestCase):
         resp = self.client.post(reverse("api:auth-register"), {
             "phone": "+22670001113", "first_name": "A", "last_name": "B",
             "role": "visitor", "password": "1234", "password2": "1234",
+            "accept_terms": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(User.objects.filter(phone="+22670001113").exists())
@@ -66,7 +69,8 @@ class AuthApiTests(APITestCase):
         User.objects.create_user(phone="+22670001114", password="pw")
         resp = self.client.post(reverse("api:auth-register"), {
             "phone": "+22670001114", "first_name": "A", "last_name": "B",
-            "role": "visitor", "password": "UnMotDePasseSolide9", "password2": "UnMotDePasseSolide9",
+            "role": "visitor", "password": "UnMotDePasseSolide9",
+            "password2": "UnMotDePasseSolide9", "accept_terms": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 

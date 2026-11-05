@@ -18,6 +18,10 @@ interface RegisterPayload {
   role: "visitor" | "supplier";
   password: string;
   password2: string;
+  /** La case cochée. Le serveur la réclame et refuse sans elle. */
+  accept_terms: boolean;
+  /** La version du texte affichée à la personne, que le serveur vérifie. */
+  terms_version: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

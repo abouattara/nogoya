@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { useAuth, RegisterError } from "@/components/providers/AuthProvider";
+import { TERMS_VERSION } from "@/content/conditions";
 
 const schema = z
   .object({
@@ -18,6 +19,13 @@ const schema = z
     role: z.enum(["visitor", "supplier"]),
     password: z.string().min(8, "8 caractères minimum"),
     password2: z.string(),
+    // Un booléen refusé tant qu'il vaut false, plutôt qu'un `literal(true)`
+    // qui rendrait le champ impossible à initialiser décoché. Une case
+    // obligatoire qui laisse passer le formulaire n'est pas une
+    // acceptation, c'est une case.
+    accept_terms: z.boolean().refine((value) => value, {
+      message: "Vous devez accepter les conditions pour créer un compte",
+    }),
   })
   .refine((data) => data.password === data.password2, {
     message: "Les mots de passe ne correspondent pas",
@@ -35,12 +43,18 @@ export default function RegisterPage() {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { role: "visitor" } });
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    // La case part décochée : une case pré-cochée n'est pas un
+    // consentement, c'est un piège, et les régulateurs le disent depuis
+    // longtemps.
+    defaultValues: { role: "visitor", accept_terms: false },
+  });
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await signUp(values);
+      await signUp({ ...values, terms_version: TERMS_VERSION });
       router.push("/login");
     } catch (err) {
       if (err instanceof RegisterError) {
@@ -73,6 +87,35 @@ export default function RegisterPage() {
         <Input label="Téléphone" placeholder="+226 70 00 00 00" {...register("phone")} error={errors.phone?.message} />
         <Input label="Mot de passe" type="password" {...register("password")} error={errors.password?.message} />
         <Input label="Confirmer le mot de passe" type="password" {...register("password2")} error={errors.password2?.message} />
+        <div className="mt-1">
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              {...register("accept_terms")}
+              aria-invalid={errors.accept_terms ? true : undefined}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            />
+            <span className="text-foreground">
+              J&apos;ai lu et j&apos;accepte les{" "}
+              <Link
+                href="/conditions"
+                target="_blank"
+                rel="noopener"
+                className="font-medium text-brand-700 underline underline-offset-2"
+              >
+                conditions et la politique d&apos;utilisation
+              </Link>
+              . Je sais que toute arnaque ou tout contenu non sain entraîne la
+              fermeture du compte.
+            </span>
+          </label>
+          {errors.accept_terms && (
+            <p role="alert" className="mt-1 text-sm text-danger-fg">
+              {errors.accept_terms.message}
+            </p>
+          )}
+        </div>
+
         {serverError && (
           <p role="alert" className="text-sm text-danger-fg">
             {serverError}
