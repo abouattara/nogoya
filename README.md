@@ -4,9 +4,13 @@ Marketplace de location et de vente entre particuliers et professionnels :
 véhicules, logements, équipements, outils, électronique, mobilier, matériel
 événementiel, agricole et professionnel.
 
-**Stack** — Next.js 16 (App Router, TypeScript, Tailwind v4) · Django 6 +
-Django REST Framework · PostgreSQL 16 · Redis · Celery · stockage
-S3-compatible (MinIO en local, Cloudflare R2 en production).
+**Stack** — Next.js 16 (App Router, TypeScript, Tailwind v4) · Flutter 3
+(Android, iOS) · Django 6 + Django REST Framework · PostgreSQL 16 · Redis ·
+Celery · stockage S3-compatible (MinIO en local, Cloudflare R2 en
+production).
+
+Le site et l'application mobile parlent à la même API : il n'y a pas de
+second backend, et aucune règle métier n'est réécrite deux fois.
 
 ## Démarrage rapide
 
@@ -93,6 +97,8 @@ annonces et catégories.
 cd backend  && python manage.py test        # 121 tests
 cd frontend && npm test                     # 65 tests composants (Vitest)
 cd frontend && npm run test:e2e             # 18 parcours (Playwright, desktop + mobile)
+cd mobile   && flutter test                 # formats et découpage du chat
+cd mobile   && flutter analyze              # aucun avertissement toléré
 ```
 
 Détails et prérequis : [TESTING.md](TESTING.md).
@@ -112,12 +118,14 @@ Détails et prérequis : [TESTING.md](TESTING.md).
 | [DEPLOYMENT-CPANEL.md](DEPLOYMENT-CPANEL.md) | mise en ligne sur un hébergement mutualisé cPanel |
 | [LIVE.md](LIVE.md) | modèles live et intégration vidéo future |
 | [TODO.md](TODO.md) | audit d'avancement, ce qui reste |
+| [mobile/README.md](mobile/README.md) | l'application Flutter : lancer, construire un APK, brancher les notifications push |
 
 ## Structure
 
 ```
 backend/    Django + DRF (API, admin, modération)
 frontend/   Next.js (App Router)
+mobile/     Flutter (Android, iOS) — même API que le site
 docker-compose.yml
 nog-prog/   ancien projet — référence visuelle, ne pas modifier
 ```

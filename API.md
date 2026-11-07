@@ -143,6 +143,23 @@ Types : `new_message`, `new_product`, `product_updated`,
 `product_approved`, `product_rejected`, `favorite`, `live_started`,
 `system`. Le champ `url` porte le chemin frontend à ouvrir au clic.
 
+## Appareils (notifications push)
+
+| Méthode | Endpoint | Description |
+|---|---|---|
+| POST | `/devices/` | enregistre un jeton Firebase (`token`, `platform`) ; réaffecte un jeton déjà connu plutôt que d'en créer un second |
+| DELETE | `/devices/{token}/` | retire l'appareil ; limité à ses propres jetons |
+
+Un jeton désigne une *installation*, pas une personne : deux comptes sur
+le même téléphone donnent le même jeton, et l'enregistrement le réaffecte
+au dernier connecté. Sans cela, les notifications de l'un partiraient sur
+l'écran de l'autre.
+
+L'envoi est facultatif. Sans `FCM_CREDENTIALS_FILE` ni `FCM_PROJECT_ID`,
+rien ne part et tout le reste fonctionne : le site et l'application
+lisent de toute façon les notifications en base. Un jeton que Firebase
+rejette est supprimé au premier envoi.
+
 ## Fournisseurs
 
 | Méthode | Endpoint | Description |

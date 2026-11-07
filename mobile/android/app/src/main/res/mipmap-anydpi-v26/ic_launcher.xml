@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  L'icone adaptative d'Android : le systeme recadre le premier plan dans
+  un masque qui varie d'un lanceur a l'autre (rond, carre, goutte). Le
+  fond est donc une couleur pleine, et la lettre garde une large marge
+  pour ne pas se faire couper sur un masque rond.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

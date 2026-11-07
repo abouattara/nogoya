@@ -214,6 +214,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # sont pas detruites — mais elle disparait du catalogue public et du
 # formulaire. Un drapeau plutot qu'une suppression : rouvrir la vente ne
 # doit pas demander un deploiement de code.
+# ---------------------------------------------------------------------------
+# Notifications push (Firebase Cloud Messaging)
+# ---------------------------------------------------------------------------
+# Rien n'est écrit ici : seul le *chemin* du compte de service transite
+# par l'environnement, et le fichier lui-même reste hors du dépôt. Sans
+# ces deux valeurs, aucune notification push ne part et tout le reste
+# fonctionne : le site et l'application lisent de toute façon les
+# notifications en base.
+FCM_CREDENTIALS_FILE = env("FCM_CREDENTIALS_FILE", default="")
+FCM_PROJECT_ID = env("FCM_PROJECT_ID", default="")
+
 LAUNCH_RENTAL_ONLY = env.bool("LAUNCH_RENTAL_ONLY", default=True)
 
 SOURCING_IMPORT_DIR = env("SOURCING_IMPORT_DIR", default=str(BASE_DIR / "imports"))

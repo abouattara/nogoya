@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Blanc : le ruban du logo est indigo et corail, et le poser sur
+         un fond indigo ferait disparaitre sa moitie sombre. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

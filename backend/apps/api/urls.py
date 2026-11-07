@@ -14,7 +14,7 @@ from apps.catalog.api import (
 )
 from apps.live.api import LiveSessionViewSet
 from apps.messaging.api import ConversationViewSet, MessageReportView
-from apps.notifications.api import NotificationViewSet
+from apps.notifications.api import DeviceTokenViewSet, NotificationViewSet
 from apps.suppliers.api import SupplierViewSet
 
 from apps.rentals.api import RentalRequestViewSet
@@ -28,6 +28,7 @@ router.register("suppliers", SupplierViewSet, basename="supplier")
 router.register("conversations", ConversationViewSet, basename="conversation")
 router.register("message-reports", MessageReportView, basename="message-report")
 router.register("notifications", NotificationViewSet, basename="notification")
+router.register("devices", DeviceTokenViewSet, basename="device")
 router.register("lives", LiveSessionViewSet, basename="live")
 router.register("discovery", DiscoveryViewSet, basename="discovery")
 router.register("rental-requests", RentalRequestViewSet, basename="rental-request")

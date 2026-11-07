@@ -7,6 +7,20 @@ from .base import env
 DEBUG = True
 
 # ---------------------------------------------------------------------------
+# L'émulateur Android fait partie du poste de développement
+# ---------------------------------------------------------------------------
+# Un émulateur Android joint le `localhost` de la machine hôte par
+# l'adresse 10.0.2.2, et envoie donc `Host: 10.0.2.2:8000`. Django la
+# refusait avec un 400 « DisallowedHost », que l'application mobile ne
+# pouvait lire autrement que comme « les informations envoyées ne sont pas
+# valides » : un message juste, qui désignait le mauvais coupable.
+#
+# L'ajout vaut pour le développement seulement. `base.py` continue de lire
+# `DJANGO_ALLOWED_HOSTS` depuis l'environnement, et la production n'a
+# aucune raison de connaître cette adresse.
+ALLOWED_HOSTS = list(ALLOWED_HOSTS) + ["10.0.2.2", "0.0.0.0", "testserver"]  # noqa: F405
+
+# ---------------------------------------------------------------------------
 # Le développement local ne dépend pas d'un Redis vivant
 # ---------------------------------------------------------------------------
 # `base.py` met le cache sur Redis, et la limitation de débit le traverse à
