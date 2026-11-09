@@ -46,10 +46,19 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
-        const res = await fetch("/api/auth/refresh", { method: "POST" });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return (data.access as string) ?? null;
+        const first = await attemptRefresh();
+        if (first.access) return first.access;
+        // Un 401 ne veut pas dire « session morte ». SimpleJWT fait
+        // tourner le jeton et met l'ancien sur liste noire : un second
+        // onglet qui se renouvelle au meme instant nous laisse avec un
+        // jeton deja consomme. Le cookie frais est pose a cet
+        // instant-la, donc une seule nouvelle tentative suffit.
+        //
+        // On ne reessaie pas quand il n'y a aucun cookie : il n'y a rien
+        // a attendre, et ce cas est celui de tout visiteur anonyme.
+        if (first.code === "no_session") return null;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return (await attemptRefresh()).access;
       } catch {
         return null;
       } finally {
@@ -58,6 +67,18 @@ export async function refreshAccessToken(): Promise<string | null> {
     })();
   }
   return refreshInFlight;
+}
+
+/** Un essai de renouvellement, avec de quoi decider s'il vaut d'etre repris. */
+async function attemptRefresh(): Promise<{ access: string | null; code?: string }> {
+  try {
+    const res = await fetch("/api/auth/refresh", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { access: null, code: (data as { code?: string }).code };
+    return { access: ((data as { access?: string }).access) ?? null };
+  } catch {
+    return { access: null };
+  }
 }
 
 interface RequestOptions extends RequestInit {
