@@ -1,9 +1,9 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/message.dart';
 import '../../core/models/paginated.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/wrapped_multipart.dart';
 import '../../core/providers.dart';
 
 class MessagingRepository {
@@ -42,18 +42,17 @@ class MessagingRepository {
   /// ou six photos deviennent six bulles.
   Future<Message> sendImages(
     int conversationId,
-    List<MultipartFile> images, {
+    List<UploadFile> images, {
     String body = '',
     void Function(int sent, int total)? onProgress,
   }) async {
-    final form = FormData();
-    if (body.isNotEmpty) form.fields.add(MapEntry('body', body));
-    for (final image in images) {
-      form.files.add(MapEntry('images', image));
-    }
+    final payload = encodeMultipart(
+      fields: body.isEmpty ? const {} : {'body': body},
+      files: images,
+    );
     final data = await _api.upload<Map<String, dynamic>>(
       '/conversations/$conversationId/messages/',
-      form,
+      payload,
       onProgress: onProgress,
     );
     return Message.fromJson(data);

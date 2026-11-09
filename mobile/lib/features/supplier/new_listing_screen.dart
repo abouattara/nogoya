@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/models/product.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/wrapped_multipart.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/states.dart';
 import 'supplier_repository.dart';
@@ -105,9 +105,16 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
         ),
       );
 
-      final files = <MultipartFile>[];
+      final files = <UploadFile>[];
       for (final photo in _photos) {
-        files.add(await MultipartFile.fromFile(photo.path, filename: photo.name));
+        files.add(
+          UploadFile(
+            field: 'images',
+            filename: photo.name,
+            bytes: await photo.readAsBytes(),
+            contentType: photo.mimeType ?? 'image/jpeg',
+          ),
+        );
       }
       await repository.uploadImages(
         product.slug,

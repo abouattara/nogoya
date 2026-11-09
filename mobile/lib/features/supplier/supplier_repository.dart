@@ -1,9 +1,9 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/paginated.dart';
 import '../../core/models/product.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/wrapped_multipart.dart';
 import '../../core/providers.dart';
 
 /// Une catégorie du catalogue, avec ses sous-catégories.
@@ -115,13 +115,12 @@ class SupplierRepository {
   /// lourde, et ou la personne ne savait pas lesquelles etaient passees.
   Future<void> uploadImages(
     String slug,
-    List<MultipartFile> images, {
+    List<UploadFile> images, {
     void Function(int done, int total)? onEach,
   }) async {
     for (var index = 0; index < images.length; index++) {
-      final form = FormData();
-      form.files.add(MapEntry('images', images[index]));
-      await _api.upload<dynamic>('/products/$slug/upload_images/', form);
+      final payload = encodeMultipart(files: [images[index]]);
+      await _api.upload<dynamic>('/products/$slug/upload_images/', payload);
       onEach?.call(index + 1, images.length);
     }
   }

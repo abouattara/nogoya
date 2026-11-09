@@ -1,5 +1,4 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/format.dart';
 import '../../core/models/message.dart';
+import '../../core/network/wrapped_multipart.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/avatar.dart';
@@ -79,10 +79,15 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
     );
     if (picked.isEmpty) return;
 
-    final files = <MultipartFile>[];
+    final files = <UploadFile>[];
     for (final image in picked) {
       files.add(
-        await MultipartFile.fromFile(image.path, filename: image.name),
+        UploadFile(
+          field: 'images',
+          filename: image.name,
+          bytes: await image.readAsBytes(),
+          contentType: image.mimeType ?? 'image/jpeg',
+        ),
       );
     }
     _stickToBottom = true;

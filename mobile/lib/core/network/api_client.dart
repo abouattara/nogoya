@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import 'wrapped_multipart.dart';
+
 import '../config/app_config.dart';
 import '../storage/token_store.dart';
 import 'api_exception.dart';
@@ -141,13 +143,31 @@ class ApiClient {
     return _run(() => _dio.delete<T>(path));
   }
 
+  /// Envoie des fichiers, enveloppes pour passer le filtre de l'hebergeur.
+  ///
+  /// Le corps est du multipart standard, mais annonce en
+  /// `application/octet-stream` avec sa frontiere dans un en-tete a part :
+  /// ModSecurity coupe la connexion des qu'une requete annonce un
+  /// formulaire et contient un `filename=`. Voir `wrapped_multipart.dart`.
   Future<T> upload<T>(
     String path,
-    FormData form, {
+    WrappedBody body, {
     void Function(int sent, int total)? onProgress,
   }) {
     return _run(
-      () => _dio.post<T>(path, data: form, onSendProgress: onProgress),
+      () => _dio.post<T>(
+        path,
+        data: Stream.fromIterable([body.bytes]),
+        onSendProgress: onProgress,
+        options: Options(
+          headers: {
+            ...body.headers,
+            // Dio ne la calcule pas pour un flux : sans elle le serveur
+            // attend indefiniment la fin du corps.
+            Headers.contentLengthHeader: body.bytes.length,
+          },
+        ),
+      ),
     );
   }
 

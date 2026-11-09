@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/message.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/wrapped_multipart.dart';
 import 'messaging_repository.dart';
 
 class ThreadState {
@@ -122,7 +122,7 @@ class ThreadController extends StateNotifier<ThreadState> {
     }
   }
 
-  Future<bool> sendImages(List<MultipartFile> images) async {
+  Future<bool> sendImages(List<UploadFile> images) async {
     if (images.isEmpty) return false;
     state = state.copyWith(sending: true, uploadProgress: 0, error: null);
     try {
