@@ -38,15 +38,20 @@ export function Header() {
           className="flex shrink-0 items-center gap-2"
         >
           <Image
-            src="/logo-binogoya-96.png"
+            src="/logo-embleme-96.png"
             alt=""
-            width={88}
+            width={85}
             height={96}
             priority
-            className="h-8 w-auto"
+            className="h-9 w-auto"
           />
-          <span className="hidden text-xl font-extrabold tracking-tight text-brand-600 sm:inline">
-            BINOGOYA
+          {/* Deux couleurs, comme sur le logo : « BINOG » en bleu, « OYA »
+              en orange. L'orange sur blanc ne tient pas le contraste d'un
+              texte courant (2,0:1) ; c'est admis pour un logotype, et le
+              nom reste porte par l'`aria-label` du lien. */}
+          <span className="hidden text-xl font-extrabold tracking-tight sm:inline" aria-hidden="true">
+            <span className="text-brand-500">BINOG</span>
+            <span className="text-accent-500">OYA</span>
           </span>
         </Link>
 

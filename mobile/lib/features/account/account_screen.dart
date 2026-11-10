@@ -219,13 +219,13 @@ class _Entry extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.accent600,
+                color: AppColors.accent500,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '$badge',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.foreground,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),

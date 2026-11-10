@@ -4,9 +4,9 @@
  * Jetons de design — thème clair unique, bâti sur le logo BINOGOYA.
  *
  * Les couleurs sont échantillonnées dans le logo, pas estimées à l'œil :
- * l'indigo #312A73 est celui du mot-repère, donc la couleur d'identité ;
- * le corail #E75267 et l'orange #F77C5D sont les extrémités chaudes du
- * ruban. Le dégradé qui forme le « B » devient la signature visuelle.
+ * le bleu #0080CC est celui de « BINOG » et du haut de l'emblème, l'orange
+ * #F7A53B celui de « OYA » et de sa base. Le dégradé qui les relie dans
+ * l'emblème devient la signature visuelle.
  *
  * Deux règles tenues dans ce fichier, et la première a coûté un vrai bug :
  *
@@ -17,47 +17,49 @@
  *    moitié vérifiés. Voir ARCHITECTURE.md « Design System ».
  *
  * 2. **Chaque paire texte/fond est mesurée.** Les contrastes WCAG ont été
- *    calculés sur les paires réellement employées. Une seule échoue, et
- *    elle est signalée là où elle se trouve : `--accent-500` ne porte
- *    jamais de texte blanc (3,6:1). Pour un bouton, c'est `--accent-600`
- *    (4,7:1).
+ *    calculés sur les paires réellement employées. Deux couleurs du logo
+ *    ne portent pas de texte blanc, et c'est signalé là où elles sont :
+ *    le bleu du logo `--brand-500` (4,2:1, sous le seuil de 4,5) et
+ *    l'orange `--accent-500` (2,0:1). Un bouton prend `--brand-600` ;
+ *    sur l'orange, le texte est foncé (7,4:1).
  */
 :root {
   color-scheme: light;
 
-  /* Indigo du logo. Le 600 est exactement la couleur du mot-repère :
-     c'est l'identité, elle ne se dérive pas. */
-  --brand-50: #f3f2fa;
-  --brand-100: #e5e3f4;
-  --brand-200: #c9c5e8;
-  --brand-300: #a49ed6;
-  --brand-400: #7b73be;
-  --brand-500: #574ea1;
-  --brand-600: #312a73; /* primaire — blanc dessus : 12,3:1 */
-  --brand-700: #29235f; /* survol / pressé — 14,0:1 */
-  --brand-800: #1f1a4a;
-  --brand-900: #161236;
+  /* Bleu du logo. Le 500 est exactement la couleur du mot-repère ; le
+     600, un cran plus dense, est celui qui porte du texte blanc. */
+  --brand-50: #eff7fc;
+  --brand-100: #dcedf8;
+  --brand-200: #b5d9f0;
+  --brand-300: #7fbde4;
+  --brand-400: #3c9bd6;
+  --brand-500: #0080cc; /* couleur du logo — blanc dessus : 4,2:1, trop peu */
+  --brand-600: #006bad; /* primaire — blanc dessus : 5,7:1 */
+  --brand-700: #005a94; /* survol / pressé — 7,3:1 */
+  --brand-800: #004876;
+  --brand-900: #003556;
 
-  /* Corail du ruban. Accent, jamais structure : il sert aux points
-     d'attention et au dégradé, pas aux fonds porteurs de texte. */
-  --accent-50: #fef1f2;
-  --accent-100: #fde2e5;
-  --accent-200: #fac4cb;
-  --accent-300: #f59aa6;
-  --accent-400: #ef7080;
-  --accent-500: #e75267; /* couleur du logo — PAS de texte blanc dessus */
-  --accent-600: #d23a52; /* le seul corail qui porte du blanc (4,7:1) */
-  --accent-700: #ae2c41;
-  --accent-800: #8a2434;
-  --accent-900: #6b1c28;
+  /* Orange du logo. Accent, jamais structure : il sert aux points
+     d'attention et au dégradé. Clair, il porte du texte foncé, pas du
+     blanc. */
+  --accent-50: #fff8ed;
+  --accent-100: #feecd0;
+  --accent-200: #fdd9a0;
+  --accent-300: #fbc16b;
+  --accent-400: #f9b24f;
+  --accent-500: #f7a53b; /* couleur du logo — texte foncé dessus (7,4:1), jamais blanc (2,0:1) */
+  --accent-600: #a85d08; /* le seul orange qui porte du blanc (5,0:1), et du texte sur blanc */
+  --accent-700: #8f4e08;
+  --accent-800: #733f09;
+  --accent-900: #573008;
 
-  /* Le ruban du logo, réutilisable : en-tête, bannières, aplats. */
+  /* Le ruban du logo, réutilisable : filets, bannières, aplats sans texte. */
   --gradient-brand: linear-gradient(
     120deg,
-    #312a73 0%,
-    #3a4a9e 28%,
-    #e75267 72%,
-    #f77c5d 100%
+    #0080cc 0%,
+    #3c8fb8 35%,
+    #c79a5c 62%,
+    #f7a53b 100%
   );
 
   /* Surfaces et texte — le blanc reste la surface principale. */
@@ -65,14 +67,13 @@
   --surface: #ffffff;
   --surface-muted: var(--brand-50);
   --surface-hover: var(--brand-100);
-  --foreground: #1c1a33; /* presque noir, sous-teinte indigo — 16,9:1 */
-  --foreground-muted: #565073; /* texte secondaire — 7,5:1 sur blanc */
-  --border: #e3e0f1;
+  --foreground: #13293d; /* presque noir, sous-teinte bleue — 14,9:1 */
+  --foreground-muted: #475c71; /* texte secondaire — 6,9:1 sur blanc */
+  --border: #dbe6ef;
   --border-strong: var(--brand-300);
 
-  /* États sémantiques. Le rouge d'erreur reste distinct du corail
-     d'accent : deux rouges voisins pour « attention » et « action »
-     tromperaient, donc l'accent ne sert jamais à une alerte. */
+  /* États sémantiques. L'orange d'accent ne sert jamais à une alerte :
+     il est trop proche de l'ambre d'avertissement pour porter deux sens. */
   --success-bg: #dcfce7;
   --success-fg: #166534;
   --warning-bg: #fef3c7;

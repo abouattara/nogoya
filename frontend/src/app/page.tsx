@@ -16,23 +16,23 @@ export default async function HomePage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      {/* Banniere en indigo, pas sur le ruban complet : le corail et
-          l'orange du logo ne portent que 3,6:1 et 2,6:1 avec du texte
-          blanc — illisibles. Le ruban reste donc decoratif, en liseré bas,
-          et le texte repose sur l'indigo (12,3:1). */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-6 py-14 text-center">
+      {/* Banniere en bleu profond, pas sur le ruban complet : l'orange
+          du logo ne porte que 2,0:1 avec du texte blanc, illisible. Le
+          ruban reste donc decoratif, en lisere bas, et le texte repose sur
+          le bleu fonce (7,3:1 au plus clair du fond, pour le blanc). */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-700 to-brand-900 px-6 py-14 text-center">
         {/* La lettre en filigrane, large et debordante. Elle est purement
             decorative — le nom est deja dans le titre de la page et dans
             l'en-tete — donc `aria-hidden` : la repeter n'apprendrait rien
             a un lecteur d'ecran. L'opacite la garde en fond sans jamais
-            disputer le contraste du texte, qui reste a 12,3:1. */}
+            disputer le contraste du texte. */}
         <Image
-          src="/logo-binogoya.png"
+          src="/logo-embleme.png"
           alt=""
-          width={305}
-          height={334}
+          width={336}
+          height={381}
           aria-hidden="true"
-          className="pointer-events-none absolute -right-10 -top-10 h-[130%] w-auto opacity-15 select-none"
+          className="pointer-events-none absolute -right-6 -top-8 h-[125%] w-auto opacity-10 brightness-0 invert select-none"
         />
 
         <div className="relative flex flex-col items-center gap-6">

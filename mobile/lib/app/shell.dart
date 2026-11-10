@@ -45,13 +45,19 @@ class AppShell extends ConsumerWidget {
             icon: Badge(
               isLabelVisible: unread > 0,
               label: Text('$unread'),
-              backgroundColor: AppColors.accent600,
+              // L'orange du logo ne porte pas de blanc (2,0:1) :
+              // le chiffre est donc fonce (7,4:1).
+              backgroundColor: AppColors.accent500,
+              textColor: AppColors.foreground,
               child: const Icon(Icons.forum_outlined),
             ),
             selectedIcon: Badge(
               isLabelVisible: unread > 0,
               label: Text('$unread'),
-              backgroundColor: AppColors.accent600,
+              // L'orange du logo ne porte pas de blanc (2,0:1) :
+              // le chiffre est donc fonce (7,4:1).
+              backgroundColor: AppColors.accent500,
+              textColor: AppColors.foreground,
               child: const Icon(Icons.forum),
             ),
             label: 'Messages',

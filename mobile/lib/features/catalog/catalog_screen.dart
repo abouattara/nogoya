@@ -105,7 +105,36 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               floating: true,
               snap: true,
               titleSpacing: 16,
-              title: const Text('BINOGOYA'),
+              title: Semantics(
+                label: 'BINOGOYA',
+                excludeSemantics: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/logo-binogoya.png', height: 30),
+                    const SizedBox(width: 8),
+                    // Deux couleurs, comme sur le logo. L'orange sur blanc
+                    // ne tient pas le contraste d'un texte courant ; c'est
+                    // admis pour un logotype, et le nom est porte par le
+                    // libelle semantique ci-dessus.
+                    const Text.rich(
+                      TextSpan(
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+                        children: [
+                          TextSpan(
+                            text: 'BINOG',
+                            style: TextStyle(color: AppColors.brand500),
+                          ),
+                          TextSpan(
+                            text: 'OYA',
+                            style: TextStyle(color: AppColors.accent500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(64),
                 child: Padding(

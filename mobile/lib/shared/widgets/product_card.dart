@@ -167,7 +167,7 @@ class _FavoriteButton extends StatelessWidget {
           child: Icon(
             isFavorite ? Icons.favorite : Icons.favorite_border,
             size: 18,
-            color: isFavorite ? AppColors.accent600 : AppColors.foregroundMuted,
+            color: isFavorite ? AppColors.danger600 : AppColors.foregroundMuted,
             semanticLabel: isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
           ),
         ),
