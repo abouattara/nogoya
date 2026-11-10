@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Sans cette ligne, l'application compilee en release n'a aucun acces
+      au reseau. Le gabarit Flutter ne la declare que dans les manifestes
+      debug et profile, pour le rechargement a chaud : tout marche donc en
+      developpement, et l'APK livre affiche « Impossible de joindre
+      BINOGOYA » sur un telephone parfaitement connecte.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="BINOGOYA"
         android:name="${applicationName}"
