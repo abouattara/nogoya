@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "BINOGOYA — la location entre particuliers et professionnels",
+    default: "BINOGOYA",
     template: "%s · BINOGOYA",
   },
   description:
