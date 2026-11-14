@@ -15,6 +15,7 @@ from apps.accounts.validators import normalize_phone
 from apps.catalog.serializers import ProductListSerializer
 
 from .models import RentalRequest
+from .notices import supplier_contact
 
 
 class RentalRequestCreateSerializer(serializers.ModelSerializer):
@@ -103,15 +104,28 @@ class RentalRequestSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     contact_released = serializers.BooleanField(read_only=True)
     nights = serializers.IntegerField(read_only=True)
+    supplier_contact = serializers.SerializerMethodField()
 
     class Meta:
         model = RentalRequest
         fields = [
             "id", "product", "start_date", "end_date", "open_ended",
             "message", "status", "status_label", "contact_released", "nights",
-            "thread", "created_at",
+            "thread", "created_at", "supplier_contact",
         ]
         read_only_fields = fields
+
+    def get_supplier_contact(self, obj):
+        """Les coordonnees du fournisseur, et seulement une fois transmises.
+
+        Avant la mise en relation, le champ vaut `None` : c'est tout le
+        principe du schema intermedie, et c'est le serveur qui le tient,
+        pas l'ecran. Apres, le client les retrouve ici a tout moment,
+        meme si le message du fil s'est perdu ou n'a jamais pu s'ecrire.
+        """
+        if obj.contact_released_at is None:
+            return None
+        return supplier_contact(obj)
 
 
 class StaffRentalRequestSerializer(RentalRequestSerializer):
@@ -125,6 +139,7 @@ class StaffRentalRequestSerializer(RentalRequestSerializer):
         fields = RentalRequestSerializer.Meta.fields + [
             "client_name", "supplier_name", "handled_by_name",
             "requester_phone", "has_account",
+            "supplier_phone", "supplier_whatsapp",
             "supplier_checked_at", "contact_released_at", "staff_note",
         ]
         read_only_fields = [
@@ -133,6 +148,20 @@ class StaffRentalRequestSerializer(RentalRequestSerializer):
 
     requester_phone = serializers.CharField(read_only=True)
     has_account = serializers.SerializerMethodField()
+    supplier_phone = serializers.SerializerMethodField()
+    supplier_whatsapp = serializers.SerializerMethodField()
+
+    def get_supplier_contact(self, obj):
+        # L'equipe voit les coordonnees en tout temps : c'est elle qui
+        # appelle le fournisseur pour verifier, et qui les relaie a un
+        # visiteur sans compte, qui n'a pas de fil ou les recevoir.
+        return supplier_contact(obj)
+
+    def get_supplier_phone(self, obj):
+        return obj.product.supplier.user.phone or ""
+
+    def get_supplier_whatsapp(self, obj):
+        return supplier_contact(obj)["whatsapp"]
 
     def get_has_account(self, obj):
         return obj.client_id is not None

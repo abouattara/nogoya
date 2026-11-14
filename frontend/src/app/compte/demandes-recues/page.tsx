@@ -206,6 +206,29 @@ function RequestCard({
 
         <div className="shrink-0 text-right text-xs text-foreground-muted">
           <p>Propriétaire : {request.supplier_name}</p>
+          {/* Le numero du fournisseur, pour verifier la disponibilite
+              avant tout. Il n'apparaissait nulle part : l'equipe devait
+              le chercher dans l'administration pour appeler. */}
+          {request.supplier_phone && (
+            <p>
+              <a href={`tel:${request.supplier_phone}`} className="font-medium text-brand-700">
+                {request.supplier_phone}
+              </a>
+              {request.supplier_whatsapp && (
+                <>
+                  {" · "}
+                  <a
+                    href={`https://wa.me/${request.supplier_whatsapp.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-brand-700"
+                  >
+                    WhatsApp
+                  </a>
+                </>
+              )}
+            </p>
+          )}
           {request.supplier_checked_at && <p>Vérifié le {formatDay(request.supplier_checked_at)}</p>}
           {request.handled_by_name && <p>Suivi par {request.handled_by_name}</p>}
           {request.thread && (
@@ -241,6 +264,31 @@ function RequestCard({
           </Button>
         )}
       </div>
+
+      {/* Apres la mise en relation, ce qu'il reste a faire depend d'une
+          seule chose : le demandeur a-t-il un fil ou les recevoir ? */}
+      {request.contact_released && (
+        <p
+          className={
+            request.has_account
+              ? "mt-3 rounded-lg bg-success-bg px-3 py-2 text-sm text-success-fg"
+              : "mt-3 rounded-lg bg-warning-bg px-3 py-2 text-sm text-warning-fg"
+          }
+        >
+          {request.has_account ? (
+            <>Coordonnées envoyées au client dans sa messagerie, avec une notification.</>
+          ) : (
+            <>
+              <strong>À relayer par téléphone :</strong> ce visiteur n&apos;a pas de compte,
+              aucun message ne lui est parvenu. Appelez-le au{" "}
+              <a href={`tel:${request.requester_phone}`} className="font-semibold underline">
+                {request.requester_phone}
+              </a>{" "}
+              et donnez-lui le {request.supplier_phone || "numéro du fournisseur"}.
+            </>
+          )}
+        </p>
+      )}
     </li>
   );
 }

@@ -110,6 +110,36 @@ function RequestList() {
                     {STATUS_EXPLANATION[request.status]}
                   </p>
 
+                  {/* Les coordonnees restent ici, a portee, une fois
+                      transmises : le message du fil se perd dans la
+                      conversation, la demande non. */}
+                  {request.supplier_contact && (
+                    <div className="mt-3 rounded-lg border border-success-fg/20 bg-success-bg p-3 text-sm text-success-fg">
+                      <p className="font-semibold">Coordonnées du fournisseur</p>
+                      <p className="mt-1">{request.supplier_contact.name}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {request.supplier_contact.phone && (
+                          <a
+                            href={`tel:${request.supplier_contact.phone}`}
+                            className="rounded-lg bg-brand-600 px-3 py-1.5 font-medium text-white hover:bg-brand-700"
+                          >
+                            Appeler le {request.supplier_contact.phone}
+                          </a>
+                        )}
+                        {request.supplier_contact.whatsapp && (
+                          <a
+                            href={`https://wa.me/${request.supplier_contact.whatsapp.replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg border border-success-fg/30 bg-surface px-3 py-1.5 font-medium text-success-fg hover:bg-success-bg"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {request.thread && (
                     <Link
                       href={`/compte/messages/${request.thread}`}

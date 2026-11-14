@@ -360,6 +360,18 @@ export interface RentalRequest {
   nights: number | null;
   thread: number | null;
   created_at: string;
+  /**
+   * Les coordonnees du fournisseur. `null` tant que l'equipe ne les a pas
+   * transmises : c'est le serveur qui tient cette regle, pas l'ecran.
+   */
+  supplier_contact: SupplierContact | null;
+}
+
+export interface SupplierContact {
+  name: string;
+  phone: string;
+  /** Vide si le fournisseur n'a pas autorise WhatsApp. */
+  whatsapp: string;
 }
 
 /** Ce que l'equipe voit en plus : qui, quand, et la note interne. */
@@ -370,6 +382,9 @@ export interface StaffRentalRequest extends RentalRequest {
   /** Par ou rappeler le demandeur : son compte, ou le numero laisse. */
   requester_phone: string;
   has_account: boolean;
+  /** Pour verifier la disponibilite, et relayer a un visiteur sans compte. */
+  supplier_phone: string;
+  supplier_whatsapp: string;
   supplier_checked_at: string | null;
   contact_released_at: string | null;
   staff_note: string;

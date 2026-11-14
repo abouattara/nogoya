@@ -18,7 +18,7 @@ from apps.catalog.models import Product
 from apps.catalog.permissions import IsStaff
 from apps.messaging.services import get_or_create_support_thread
 
-from .notices import announce_request
+from .notices import announce_contact, announce_request
 
 from .models import RentalRequest
 from .serializers import (
@@ -158,6 +158,10 @@ class RentalRequestViewSet(
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Une seule fois : un second clic, ou deux personnes de l'equipe
+        # sur la meme demande, ne doivent pas envoyer deux fois les
+        # coordonnees au client.
+        premiere_fois = demande.contact_released_at is None
         demande.contact_released_at = demande.contact_released_at or timezone.now()
         demande.released_by = demande.released_by or request.user
         demande.status = RentalRequest.Status.CONNECTED
@@ -167,6 +171,8 @@ class RentalRequestViewSet(
                 "contact_released_at", "released_by", "status", "handled_by", "updated_at",
             ]
         )
+        if premiere_fois:
+            announce_contact(demande, request.user)
         logger.info(
             "Coordonnées transmises : demande %s, bien %s, client %s, par %s",
             demande.pk, demande.product.slug, demande.client_id, request.user.phone,
