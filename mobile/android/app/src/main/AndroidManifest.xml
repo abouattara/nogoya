@@ -7,6 +7,9 @@
       BINOGOYA » sur un telephone parfaitement connecte.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Les messages vocaux. Demandee au moment d'enregistrer, pas au
+         lancement : une permission reclamee sans contexte se refuse. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:label="BINOGOYA"
         android:name="${applicationName}"

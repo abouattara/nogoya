@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/models/rental_request.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_colors.dart';
+import '../../shared/widgets/contact_actions.dart';
 import '../../shared/widgets/states.dart';
 import '../rentals/my_requests_screen.dart';
 import '../rentals/rentals_repository.dart';
@@ -165,7 +166,13 @@ class _StaffRequestCardState extends ConsumerState<_StaffRequestCard> {
             const SizedBox(height: 8),
             _Line(label: 'Demandeur', value: request.clientName ?? 'Inconnu'),
             if (request.supplierName != null)
-              _Line(label: 'Fournisseur', value: request.supplierName!),
+              _Line(
+                label: 'Fournisseur',
+                value: [
+                  request.supplierName!,
+                  if ((request.supplierPhone ?? '').isNotEmpty) request.supplierPhone!,
+                ].join(' · '),
+              ),
             if (request.handledByName != null)
               _Line(label: 'Suivi par', value: request.handledByName!),
             if (request.supplierCheckedAt != null)
@@ -184,6 +191,43 @@ class _StaffRequestCardState extends ConsumerState<_StaffRequestCard> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(request.message, style: const TextStyle(fontSize: 13)),
+              ),
+            ],
+
+            // Appeler le fournisseur, c'est la verification elle-meme.
+            if (!request.contactReleased && (request.supplierPhone ?? '').isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'Appeler le fournisseur pour vérifier',
+                style: TextStyle(fontSize: 12, color: AppColors.foregroundMuted),
+              ),
+              const SizedBox(height: 4),
+              ContactButtons(
+                phone: request.supplierPhone!,
+                whatsapp: request.supplierWhatsapp ?? '',
+              ),
+            ],
+            if (request.contactReleased) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: withoutAccount ? AppColors.warningBg : AppColors.successBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  withoutAccount
+                      ? "À relayer par téléphone : ce visiteur n'a pas de compte, "
+                          'aucun message ne lui est parvenu. Appelez-le et donnez-lui '
+                          'le ${request.supplierPhone ?? 'numéro du fournisseur'}.'
+                      : 'Coordonnées envoyées au client dans sa messagerie, '
+                          'avec une notification.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: withoutAccount ? AppColors.warningFg : AppColors.successFg,
+                  ),
+                ),
               ),
             ],
 

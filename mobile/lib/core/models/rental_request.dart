@@ -32,6 +32,26 @@ enum RentalStatus {
   }
 }
 
+/// Les coordonnées du fournisseur, une fois transmises par l'équipe.
+class SupplierContact {
+  const SupplierContact({required this.name, required this.phone, required this.whatsapp});
+
+  final String name;
+  final String phone;
+
+  /// Vide si le fournisseur n'a pas autorisé WhatsApp.
+  final String whatsapp;
+
+  static SupplierContact? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    return SupplierContact(
+      name: json.str('name', 'Fournisseur'),
+      phone: json.str('phone'),
+      whatsapp: json.str('whatsapp'),
+    );
+  }
+}
+
 /// Une demande de location, cote client comme cote équipe.
 ///
 /// Les champs d'équipe (`requesterPhone`, `clientName`, `staffNote`...)
@@ -60,6 +80,9 @@ class RentalRequest {
     this.supplierCheckedAt,
     this.contactReleasedAt,
     this.staffNote,
+    this.supplierContact,
+    this.supplierPhone,
+    this.supplierWhatsapp,
   });
 
   final int id;
@@ -94,6 +117,15 @@ class RentalRequest {
   final DateTime? contactReleasedAt;
   final String? staffNote;
 
+  /// Nul tant que l'equipe n'a pas transmis les coordonnees : c'est le
+  /// serveur qui tient cette regle, l'ecran ne fait que l'afficher.
+  final SupplierContact? supplierContact;
+
+  /// Cote equipe seulement : pour verifier la disponibilite, et relayer
+  /// a un visiteur sans compte, qui n'a pas de fil.
+  final String? supplierPhone;
+  final String? supplierWhatsapp;
+
   /// Mettre en relation sur un bien non vérifie est la seule faute que ce
   /// schema existe pour eviter : le serveur le refuse, et l'application
   /// n'affiche donc pas le bouton.
@@ -122,6 +154,9 @@ class RentalRequest {
       supplierCheckedAt: json.dateOf('supplier_checked_at'),
       contactReleasedAt: json.dateOf('contact_released_at'),
       staffNote: json.strOrNull('staff_note'),
+      supplierContact: SupplierContact.fromJson(json.mapOf('supplier_contact')),
+      supplierPhone: json.strOrNull('supplier_phone'),
+      supplierWhatsapp: json.strOrNull('supplier_whatsapp'),
     );
   }
 }

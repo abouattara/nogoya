@@ -13,6 +13,8 @@ import '../../shared/widgets/avatar.dart';
 import '../../shared/widgets/states.dart';
 import 'chat_rows.dart';
 import 'thread_controller.dart';
+import 'voice_player.dart';
+import 'voice_recorder.dart';
 
 /// Un fil de discussion avec l'équipe BINOGOYA.
 class ThreadScreen extends ConsumerStatefulWidget {
@@ -28,6 +30,9 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _stickToBottom = true;
+
+  /// La barre d'enregistrement remplace le champ tant qu'elle est ouverte.
+  bool _recording = false;
 
   @override
   void initState() {
@@ -65,6 +70,14 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
       // L'envoi a echoue : le texte revient dans le champ, il n'est pas perdu.
       _input.text = text;
     }
+  }
+
+  Future<void> _sendVoice(RecordedVoice voice) async {
+    _stickToBottom = true;
+    await ref
+        .read(threadProvider(widget.conversationId).notifier)
+        .sendAudio(voice.file, voice.seconds);
+    if (mounted) setState(() => _recording = false);
   }
 
   Future<void> _pickImages() async {
@@ -171,12 +184,19 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
           ),
           if (state.uploadProgress != null)
             LinearProgressIndicator(value: state.uploadProgress),
-          _Composer(
-            controller: _input,
-            sending: state.sending,
-            onSend: _send,
-            onPickImages: _pickImages,
-          ),
+          if (_recording)
+            VoiceRecorderBar(
+              onCancel: () => setState(() => _recording = false),
+              onSend: _sendVoice,
+            )
+          else
+            _Composer(
+              controller: _input,
+              sending: state.sending,
+              onSend: _send,
+              onPickImages: _pickImages,
+              onRecord: () => setState(() => _recording = true),
+            ),
         ],
       ),
     );
@@ -266,7 +286,7 @@ class _Bubble extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (message.attachments.isNotEmpty)
-                        _Attachments(attachments: message.attachments),
+                        _Attachments(attachments: message.attachments, mine: mine),
                       if (message.body.isNotEmpty)
                         Padding(
                           padding: message.attachments.isEmpty
@@ -406,9 +426,12 @@ class _SystemNote extends StatelessWidget {
 /// sont pas servis par une URL de stockage, et l'API revérifie
 /// l'appartenance a chaque requete.
 class _Attachments extends ConsumerWidget {
-  const _Attachments({required this.attachments});
+  const _Attachments({required this.attachments, required this.mine});
 
   final List<MessageAttachment> attachments;
+
+  /// Dans une bulle a moi, sur fond bleu : le lecteur vocal passe en blanc.
+  final bool mine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -448,23 +471,18 @@ class _Attachments extends ConsumerWidget {
               ),
             ),
           ),
-        for (final other in others)
+        for (final audio in others.where((item) => item.kind == AttachmentKind.audio))
+          VoicePlayer(attachment: audio, mine: mine),
+        for (final other in others.where((item) => item.kind != AttachmentKind.audio))
           Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  other.kind == AttachmentKind.audio
-                      ? Icons.mic_none
-                      : Icons.videocam_outlined,
-                  size: 18,
-                ),
+                const Icon(Icons.videocam_outlined, size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  other.kind == AttachmentKind.audio
-                      ? 'Message vocal (${Fmt.duration(other.duration)})'
-                      : 'Video (${Fmt.duration(other.duration)})',
+                  'Vidéo (${Fmt.duration(other.duration)}), à regarder sur le site',
                   style: const TextStyle(fontSize: 13),
                 ),
               ],
@@ -520,12 +538,14 @@ class _Composer extends StatelessWidget {
     required this.sending,
     required this.onSend,
     required this.onPickImages,
+    required this.onRecord,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
   final VoidCallback onPickImages;
+  final VoidCallback onRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -544,6 +564,12 @@ class _Composer extends StatelessWidget {
               onPressed: sending ? null : onPickImages,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               tooltip: 'Joindre des photos',
+              color: AppColors.foregroundMuted,
+            ),
+            IconButton(
+              onPressed: sending ? null : onRecord,
+              icon: const Icon(Icons.mic_none),
+              tooltip: 'Enregistrer un message vocal',
               color: AppColors.foregroundMuted,
             ),
             Expanded(

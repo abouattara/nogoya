@@ -171,6 +171,22 @@ class ApiClient {
     );
   }
 
+  /// Recupere un fichier protege, avec le jeton.
+  ///
+  /// Les pieces jointes d'une conversation ne sont pas servies par une URL
+  /// de stockage : l'API reverifie l'appartenance a chaque requete. Un
+  /// lecteur audio qui ouvrirait l'URL lui-meme partirait sans en-tete
+  /// d'autorisation et recevrait un 401. On telecharge donc ici, a travers
+  /// l'intercepteur qui pose le jeton et le renouvelle au besoin.
+  Future<List<int>> download(String url) {
+    return _run(
+      () => _dio.get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes, headers: {'Accept': '*/*'}),
+      ),
+    );
+  }
+
   Future<T> _run<T>(Future<Response<T>> Function() call) async {
     try {
       final response = await call();

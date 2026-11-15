@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/models/paginated.dart';
 import '../../core/models/rental_request.dart';
 import '../../core/theme/app_colors.dart';
+import '../../shared/widgets/contact_actions.dart';
 import '../../shared/widgets/states.dart';
 import 'rentals_repository.dart';
 
@@ -113,6 +114,38 @@ class _RequestCard extends StatelessWidget {
               ],
               const SizedBox(height: 12),
               _Progress(status: request.status, contactReleased: request.contactReleased),
+              // Les coordonnees restent ici, a portee, une fois transmises :
+              // le message du fil se perd dans la conversation, la demande non.
+              if (request.supplierContact != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.successBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Coordonnées du fournisseur',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.successFg),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        request.supplierContact!.name,
+                        style: const TextStyle(color: AppColors.successFg),
+                      ),
+                      const SizedBox(height: 8),
+                      ContactButtons(
+                        phone: request.supplierContact!.phone,
+                        whatsapp: request.supplierContact!.whatsapp,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (request.threadId != null) ...[
                 const SizedBox(height: 10),
                 Align(

@@ -149,6 +149,29 @@ class ThreadController extends StateNotifier<ThreadState> {
     }
   }
 
+  Future<bool> sendAudio(UploadFile audio, int seconds) async {
+    state = state.copyWith(sending: true, uploadProgress: 0, error: null);
+    try {
+      await _repository.sendAudio(
+        _conversationId,
+        audio,
+        seconds,
+        onProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          state = state.copyWith(uploadProgress: sent / total);
+        },
+      );
+      await _load();
+      if (mounted) state = state.copyWith(sending: false, uploadProgress: null);
+      return true;
+    } on ApiException catch (error) {
+      if (mounted) {
+        state = state.copyWith(sending: false, uploadProgress: null, error: error.message);
+      }
+      return false;
+    }
+  }
+
   void clearError() {
     if (mounted) state = state.copyWith(error: null);
   }

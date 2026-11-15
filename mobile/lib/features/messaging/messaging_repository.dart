@@ -58,6 +58,30 @@ class MessagingRepository {
     return Message.fromJson(data);
   }
 
+  /// Envoie un message vocal.
+  ///
+  /// `durations` accompagne `audios` dans le meme ordre : le serveur s'en
+  /// sert pour la barre de progression et refuse un vocal trop long.
+  Future<Message> sendAudio(
+    int conversationId,
+    UploadFile audio,
+    int seconds, {
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final payload = encodeMultipart(
+      fields: {'durations': '$seconds'},
+      files: [audio],
+    );
+    final data = await _api.upload<Map<String, dynamic>>(
+      '/conversations/$conversationId/messages/',
+      payload,
+      onProgress: onProgress,
+    );
+    return Message.fromJson(data);
+  }
+
+  Future<List<int>> downloadAttachment(String url) => _api.download(url);
+
   Future<void> markRead(int conversationId) async {
     await _api.post<dynamic>('/conversations/$conversationId/read/');
   }
