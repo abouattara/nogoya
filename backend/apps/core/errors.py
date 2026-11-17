@@ -34,3 +34,27 @@ def storage_failure_reason(exc):
     # « DataError » oriente immédiatement le diagnostic sans rien révéler
     # des chemins, des requêtes ou de la configuration.
     return f"le serveur n'a pas pu enregistrer ce fichier ({type(exc).__name__})"
+
+
+def is_unsupported_character(exc):
+    """La base a-t-elle refusé un caractère qu'elle ne sait pas stocker ?
+
+    MariaDB et MySQL répondent ainsi (erreur 1366, « Incorrect string
+    value ») quand une table est encore en `utf8` à trois octets et qu'on
+    lui donne un emoji, qui en demande quatre. La connexion du projet est
+    bien en `utf8mb4` ; ce sont les tables créées avant qui ne le sont pas,
+    jusqu'à `manage.py convert_to_utf8mb4`.
+
+    Mesuré en production le 2026-11-17 : « Sonde emoji 😀 » refusé en 422,
+    le même texte sans l'emoji accepté.
+    """
+    args = getattr(exc, "args", ()) or ()
+    if args and args[0] == 1366:
+        return True
+    return "Incorrect string value" in str(exc)
+
+
+UNSUPPORTED_CHARACTER_MESSAGE = (
+    "Ce texte contient un caractère que le serveur n'accepte pas encore, "
+    "un emoji par exemple. Retirez-le et réessayez."
+)

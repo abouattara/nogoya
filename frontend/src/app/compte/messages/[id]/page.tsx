@@ -112,8 +112,33 @@ function Thread({ conversationId }: { conversationId: string }) {
       setProgress
     );
     cancelUpload.current = handle.cancel;
+    // Le dernier message à moi avant l'envoi. Comparer des identifiants
+    // plutôt que des heures : l'horloge du téléphone et celle du serveur ne
+    // s'accordent pas toujours.
+    const lastMineBefore = Math.max(
+      0,
+      ...messages.filter((m) => m.is_mine).map((m) => m.id)
+    );
     try {
-      await handle.done;
+      try {
+        await handle.done;
+      } catch (err) {
+        // Une erreur ne prouve pas que rien n'est parti. Le serveur peut
+        // avoir enregistré le message puis échoué sur la suite, ou la
+        // connexion s'être coupée pendant la réponse. Laisser l'erreur et
+        // le brouillon invitait à renvoyer, donc à doubler le message. On
+        // relit le fil : s'il y est, l'envoi a réussi.
+        const fresh = await queryClient
+          .fetchQuery({
+            queryKey: ["messages", conversationId],
+            queryFn: () =>
+              apiFetch<Paginated<ChatMessage>>(`/api/v1/conversations/${conversationId}/messages/`),
+            staleTime: 0,
+          })
+          .catch(() => null);
+        const arrived = fresh?.results.some((m) => m.is_mine && m.id > lastMineBefore);
+        if (!arrived) throw err;
+      }
       // On attend que la liste soit revenue avant de retirer l'écho :
       // l'effacer plus tôt ferait clignoter le message à l'envoi.
       await queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });

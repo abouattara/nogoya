@@ -102,6 +102,29 @@ class ThreadController extends StateNotifier<ThreadState> {
 
   Future<void> reload() => _load(first: true);
 
+  /// Le dernier message a moi que l'ecran connait.
+  int _lastMineId() => state.messages
+      .where((m) => m.isMine)
+      .fold(0, (highest, m) => m.id > highest ? m.id : highest);
+
+  /// Un message a moi plus recent que [id] est-il arrive malgre l'erreur ?
+  ///
+  /// Une erreur ne prouve pas que rien n'est parti : le serveur peut avoir
+  /// enregistre le message puis echoue sur la suite, ou la connexion
+  /// s'etre coupee pendant la reponse. Afficher l'echec invitait alors a
+  /// renvoyer, donc a doubler le message. On relit le fil pour trancher.
+  /// Les identifiants, pas les heures : l'horloge du telephone et celle du
+  /// serveur ne s'accordent pas toujours.
+  Future<int?> _arrivedAfter(int id) async {
+    try {
+      final page = await _repository.messages(_conversationId);
+      final mine = page.results.where((m) => m.isMine && m.id > id).map((m) => m.id);
+      return mine.isEmpty ? null : mine.reduce((a, b) => a > b ? a : b);
+    } on ApiException {
+      return null;
+    }
+  }
+
   Future<bool> sendText(String body) async {
     final text = body.trim();
     if (text.isEmpty) return false;
@@ -109,8 +132,13 @@ class ThreadController extends StateNotifier<ThreadState> {
     // Le champ se vide tout de suite et le texte passe dans l'echo : on
     // ne retape pas un message parce que le réseau a mis deux secondes.
     state = state.copyWith(sending: true, echo: text, error: null);
+    final before = _lastMineId();
     try {
-      await _repository.sendText(_conversationId, text);
+      try {
+        await _repository.sendText(_conversationId, text);
+      } on ApiException {
+        if (await _arrivedAfter(before) == null) rethrow;
+      }
       await _load();
       if (mounted) state = state.copyWith(sending: false, echo: null);
       return true;
@@ -130,17 +158,25 @@ class ThreadController extends StateNotifier<ThreadState> {
       // coup sur la limite de duree de l'hebergeur sur un reseau mobile,
       // et la coupure les perdait toutes ; une par une, chacune tient, et
       // celles deja parties restent parties.
+      var lastMine = _lastMineId();
       for (var index = 0; index < images.length; index++) {
-        await _repository.sendImages(
-          _conversationId,
-          [images[index]],
-          onProgress: (sent, total) {
-            if (!mounted || total <= 0) return;
-            state = state.copyWith(
-              uploadProgress: (index + sent / total) / images.length,
-            );
-          },
-        );
+        try {
+          final sent = await _repository.sendImages(
+            _conversationId,
+            [images[index]],
+            onProgress: (sent, total) {
+              if (!mounted || total <= 0) return;
+              state = state.copyWith(
+                uploadProgress: (index + sent / total) / images.length,
+              );
+            },
+          );
+          lastMine = sent.id;
+        } on ApiException {
+          final arrived = await _arrivedAfter(lastMine);
+          if (arrived == null) rethrow;
+          lastMine = arrived;
+        }
       }
       await _load();
       if (mounted) state = state.copyWith(sending: false, uploadProgress: null);
@@ -159,16 +195,21 @@ class ThreadController extends StateNotifier<ThreadState> {
 
   Future<bool> sendAudio(UploadFile audio, int seconds) async {
     state = state.copyWith(sending: true, uploadProgress: 0, error: null);
+    final before = _lastMineId();
     try {
-      await _repository.sendAudio(
-        _conversationId,
-        audio,
-        seconds,
-        onProgress: (sent, total) {
-          if (!mounted || total <= 0) return;
-          state = state.copyWith(uploadProgress: sent / total);
-        },
-      );
+      try {
+        await _repository.sendAudio(
+          _conversationId,
+          audio,
+          seconds,
+          onProgress: (sent, total) {
+            if (!mounted || total <= 0) return;
+            state = state.copyWith(uploadProgress: sent / total);
+          },
+        );
+      } on ApiException {
+        if (await _arrivedAfter(before) == null) rethrow;
+      }
       await _load();
       if (mounted) state = state.copyWith(sending: false, uploadProgress: null);
       return true;

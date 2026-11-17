@@ -6,7 +6,11 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import logging
 
-from apps.core.errors import storage_failure_reason
+from apps.core.errors import (
+    UNSUPPORTED_CHARACTER_MESSAGE,
+    is_unsupported_character,
+    storage_failure_reason,
+)
 from apps.core.parsers import WrappedMultiPartParser
 from rest_framework import mixins, parsers, permissions, renderers, status, viewsets
 from rest_framework.decorators import action
@@ -21,7 +25,6 @@ from apps.notifications.services import notify
 from .models import Conversation, ConversationBlock, Message, MessageReport
 from .permissions import IsConversationParticipant
 from .serializers import (
-    TYPE_PREVIEW,
     ConversationSerializer,
     MessageCreateSerializer,
     MessageSerializer,
@@ -42,6 +45,17 @@ User = get_user_model()
 
 logger = logging.getLogger("nogoya.messaging")
 
+
+# Le texte d'une notification, par type de message. Sans emoji, contrairement
+# à l'aperçu de la liste des fils : celui-là est calculé à l'affichage, alors
+# qu'une notification s'écrit en base, et une base dont les tables ne sont
+# pas en utf8mb4 refuse un emoji.
+NOTIFICATION_PREVIEW = {
+    Message.Type.AUDIO: "Message vocal",
+    Message.Type.IMAGE: "Photo",
+    Message.Type.VIDEO: "Vidéo",
+    Message.Type.PRODUCT: "Annonce jointe",
+}
 
 class MediaRenderer(renderers.BaseRenderer):
     """Accepts any `Accept` header on the media endpoints.
@@ -177,6 +191,11 @@ class ConversationViewSet(
                 logger.exception(
                     "Échec d'envoi d'un message dans la conversation %s", conversation.pk
                 )
+                if is_unsupported_character(exc):
+                    return Response(
+                        {"detail": UNSUPPORTED_CHARACTER_MESSAGE},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 return Response(
                     {"detail": f"L'envoi a échoué : {storage_failure_reason(exc)}."},
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -188,7 +207,18 @@ class ConversationViewSet(
                 .select_related("sender", "shared_product")
                 .get(pk=message.pk)
             )
-            self._notify_recipient(conversation, message)
+            # Le message est enregistré. Prévenir le destinataire est un
+            # bonus : si cela échoue, on le journalise, on ne transforme pas
+            # un envoi réussi en erreur. C'est exactement ce qui arrivait :
+            # la notification d'une photo commençait par un emoji que la
+            # base refusait, le serveur répondait 500, et l'équipe voyait
+            # « L'envoi a échoué » sur un message pourtant parti.
+            try:
+                self._notify_recipient(conversation, message)
+            except Exception:
+                logger.exception(
+                    "Notification non créée pour le message %s", message.pk
+                )
             return Response(
                 MessageSerializer(message, context={"request": request}).data,
                 status=status.HTTP_201_CREATED,
@@ -215,7 +245,11 @@ class ConversationViewSet(
             return  # message du membre : rien à notifier côté service
         recipient = member
         sender_name = support.public_name(SUPPORT_NAME)
-        preview = TYPE_PREVIEW.get(message.message_type) or message.body[:120] or "📎 Annonce jointe"
+        preview = (
+            NOTIFICATION_PREVIEW.get(message.message_type)
+            or message.body[:120]
+            or "Annonce jointe"
+        )
         notify(
             recipient,
             type=Notification.Type.NEW_MESSAGE,
