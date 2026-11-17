@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/media/upload_budget.dart';
 import '../../core/models/product.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/wrapped_multipart.dart';
@@ -52,8 +53,8 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
     // On compresse a la prise : les fichiers bruts de 12 Mpx faisaient
     // echouer l'envoi cote serveur sur le site, et le réseau d'ici ne
     // les supporterait pas davantage.
-    const width = 1600.0;
-    const quality = 82;
+    const width = UploadBudget.listingPhotoEdge;
+    const quality = UploadBudget.startQuality;
 
     if (fromCamera) {
       final shot = await picker.pickImage(
@@ -107,12 +108,15 @@ class _NewListingScreenState extends ConsumerState<NewListingScreen> {
 
       final files = <UploadFile>[];
       for (final photo in _photos) {
+        final raw = await photo.readAsBytes();
+        final fitted = await fitPhotoToBudget(raw, UploadBudget.listingPhotoBytes);
         files.add(
           UploadFile(
             field: 'images',
             filename: photo.name,
-            bytes: await photo.readAsBytes(),
-            contentType: photo.mimeType ?? 'image/jpeg',
+            bytes: fitted,
+            // Recompressee, c'est du JPEG ; intacte, elle garde son type.
+            contentType: identical(fitted, raw) ? (photo.mimeType ?? 'image/jpeg') : 'image/jpeg',
           ),
         );
       }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/format.dart';
+import '../../core/media/upload_budget.dart';
 import '../../core/models/message.dart';
 import '../../core/network/wrapped_multipart.dart';
 import '../../core/providers.dart';
@@ -85,21 +86,26 @@ class _ThreadScreenState extends ConsumerState<ThreadScreen> {
       // Le téléphone compresse avant l'envoi : les fichiers bruts de 12 Mpx
       // faisaient echouer la requete cote serveur sur le site, et le
       // réseau d'ici ne les supporterait pas davantage.
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 82,
+      // Le poids decide si une photo arrive : l'hebergeur coupe tout envoi
+      // de plus d'une trentaine de secondes. Voir `upload_budget.dart`.
+      maxWidth: UploadBudget.chatPhotoEdge,
+      maxHeight: UploadBudget.chatPhotoEdge,
+      imageQuality: UploadBudget.startQuality,
       limit: 6,
     );
     if (picked.isEmpty) return;
 
     final files = <UploadFile>[];
     for (final image in picked) {
+      final raw = await image.readAsBytes();
+      final fitted = await fitPhotoToBudget(raw, UploadBudget.chatPhotoBytes);
       files.add(
         UploadFile(
           field: 'images',
           filename: image.name,
-          bytes: await image.readAsBytes(),
-          contentType: image.mimeType ?? 'image/jpeg',
+          bytes: fitted,
+          // Recompressee, c'est du JPEG ; intacte, elle garde son type.
+          contentType: identical(fitted, raw) ? (image.mimeType ?? 'image/jpeg') : 'image/jpeg',
         ),
       );
     }

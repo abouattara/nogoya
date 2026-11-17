@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 /// Une erreur d'API, déjà traduite.
@@ -51,6 +53,16 @@ class ApiException implements Exception {
         return ApiException('Demande annulée.', statusCode: status);
       default:
         break;
+    }
+
+    // La connexion coupée en cours de route. C'est ce que fait
+    // l'hébergeur d'un envoi qui dure plus d'une trentaine de secondes, et
+    // c'est ce qui se cachait derrière « Une erreur est survenue » quand
+    // une photo ne partait pas depuis un téléphone.
+    if (status == null && (error.error is SocketException || error.error is HttpException)) {
+      return ApiException(
+        "La connexion a été coupée pendant l'envoi. Réessayez, si possible en Wi-Fi.",
+      );
     }
 
     final fields = _readFieldErrors(error.response?.data);

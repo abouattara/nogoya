@@ -38,9 +38,12 @@ class VoiceRecorderBar extends StatefulWidget {
 }
 
 class _VoiceRecorderBarState extends State<VoiceRecorderBar> {
-  /// La limite du serveur (`MAX_AUDIO_DURATION_SECONDS`). On s'arrête
-  /// avant, plutôt que d'enregistrer cinq minutes que le serveur refuse.
-  static const _maxSeconds = 300;
+  /// Deux minutes. Le serveur en accepte cinq, mais un vocal de cinq
+  /// minutes pèse près d'un mégaoctet, et l'hébergeur coupe tout envoi de
+  /// plus d'une trentaine de secondes : sur un réseau mobile, il ne
+  /// partirait jamais. Deux minutes à 24 kb/s font 360 Ko, une quinzaine
+  /// de secondes d'envoi à 20 Ko/s.
+  static const _maxSeconds = 120;
 
   final _recorder = AudioRecorder();
   Timer? _ticker;
@@ -74,10 +77,12 @@ class _VoiceRecorderBarState extends State<VoiceRecorderBar> {
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
-          // 64 kb/s en mono : une voix reste nette, et une minute pèse
-          // environ 500 Ko, ce que le réseau d'ici supporte.
-          bitRate: 64000,
-          sampleRate: 44100,
+          // 24 kb/s, 16 kHz, mono : le débit d'une voix au téléphone,
+          // nette et légère. Une minute pèse 180 Ko. Le 64 kb/s précédent
+          // en pesait 480, et un vocal d'une minute ne partait pas sur un
+          // réseau mobile.
+          bitRate: 24000,
+          sampleRate: 16000,
           numChannels: 1,
         ),
         path: path,
@@ -187,7 +192,7 @@ class _VoiceRecorderBarState extends State<VoiceRecorderBar> {
                       _sending
                           ? 'Envoi…'
                           : _recording
-                              ? 'Enregistrement en cours'
+                              ? 'Enregistrement, 2 min au plus'
                               : 'Préparation du micro…',
                       style: const TextStyle(fontSize: 13, color: AppColors.foregroundMuted),
                     ),

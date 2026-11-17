@@ -157,16 +157,12 @@ class ApiClient {
     return _run(
       () => _dio.post<T>(
         path,
-        data: Stream.fromIterable([body.bytes]),
+        // Des octets plutot qu'un flux : Dio calcule alors lui-meme la
+        // longueur et la progression, et refabrique le corps si
+        // l'intercepteur relance la requete apres un jeton expire.
+        data: body.bytes,
         onSendProgress: onProgress,
-        options: Options(
-          headers: {
-            ...body.headers,
-            // Dio ne la calcule pas pour un flux : sans elle le serveur
-            // attend indefiniment la fin du corps.
-            Headers.contentLengthHeader: body.bytes.length,
-          },
-        ),
+        options: Options(headers: body.headers),
       ),
     );
   }

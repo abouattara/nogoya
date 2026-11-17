@@ -126,14 +126,22 @@ class ThreadController extends StateNotifier<ThreadState> {
     if (images.isEmpty) return false;
     state = state.copyWith(sending: true, uploadProgress: 0, error: null);
     try {
-      await _repository.sendImages(
-        _conversationId,
-        images,
-        onProgress: (sent, total) {
-          if (!mounted || total <= 0) return;
-          state = state.copyWith(uploadProgress: sent / total);
-        },
-      );
+      // Une photo par requete. Six photos dans un seul envoi depassaient a
+      // coup sur la limite de duree de l'hebergeur sur un reseau mobile,
+      // et la coupure les perdait toutes ; une par une, chacune tient, et
+      // celles deja parties restent parties.
+      for (var index = 0; index < images.length; index++) {
+        await _repository.sendImages(
+          _conversationId,
+          [images[index]],
+          onProgress: (sent, total) {
+            if (!mounted || total <= 0) return;
+            state = state.copyWith(
+              uploadProgress: (index + sent / total) / images.length,
+            );
+          },
+        );
+      }
       await _load();
       if (mounted) state = state.copyWith(sending: false, uploadProgress: null);
       return true;
