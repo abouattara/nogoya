@@ -326,7 +326,7 @@ CORS_ALLOWED_ORIGINS = env.list(
 CORS_ALLOW_CREDENTIALS = True
 # The anonymous visitor id travels as a header (see apps.core.middleware),
 # and so does the boundary of an encapsulated upload (apps.core.parsers).
-CORS_ALLOW_HEADERS = (*cors_default_headers, "x-visitor-id", "x-upload-boundary")
+CORS_ALLOW_HEADERS = (*cors_default_headers, "x-visitor-id", "x-upload-boundary", "x-client")
 
 # ---------------------------------------------------------------------------
 # Logging (console; replaces the old print() debugging)

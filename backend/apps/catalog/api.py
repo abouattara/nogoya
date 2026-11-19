@@ -188,6 +188,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 query=request.query_params.get("search", ""),
                 filters=filters,
                 results_count=count,
+                page=request.query_params.get("page", 1),
             )
         return response
 

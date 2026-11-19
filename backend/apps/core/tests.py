@@ -182,3 +182,70 @@ class PurgeDataTests(TestCase):
     def test_it_reminds_that_image_files_survive_the_rows(self):
         output = self._run("--yes")
         self.assertIn("prune_media", output)
+
+    # --- ce que la purge complète emporte, et ce qu'elle garde -------------
+    def _content(self):
+        from datetime import date
+
+        from apps.analytics.models import SearchEvent
+        from apps.live.models import LiveSession
+        from apps.rentals.models import RentalRequest
+
+        SearchEvent.objects.create(query="tente", normalized_query="tente", user=self.reel)
+        SearchEvent.objects.create(query="moto", normalized_query="moto", visitor_id="a" * 32)
+        LiveSession.objects.create(host=self.demo, title="Direct d'essai")
+        RentalRequest.objects.create(
+            product=self.real_product, client=self.demo,
+            start_date=date(2026, 12, 1), end_date=date(2026, 12, 3),
+        )
+
+    def test_the_all_scope_also_empties_searches_lives_and_requests(self):
+        from apps.analytics.models import SearchEvent
+        from apps.live.models import LiveSession
+        from apps.rentals.models import RentalRequest
+
+        self._content()
+        self._run("--scope", "all", "--yes")
+        self.assertFalse(SearchEvent.objects.exists())
+        self.assertFalse(LiveSession.objects.exists())
+        self.assertFalse(RentalRequest.objects.exists())
+        self.assertEqual(User.objects.count(), 2)
+
+    def test_accounts_only_go_when_asked_and_the_team_always_stays(self):
+        from apps.messaging.services import SUPPORT_PHONE, support_account
+
+        support_account()
+        staff = User.objects.create_user(phone="+22670010900", password="pw", is_staff=True)
+        root = User.objects.create_superuser(phone="+22670010901", password="pw")
+        kept = User.objects.create_user(phone="+22670010902", password="pw")
+
+        self._run("--scope", "all", "--with-accounts", "--keep-phone", kept.phone, "--yes")
+
+        remaining = set(User.objects.values_list("phone", flat=True))
+        self.assertEqual(remaining, {SUPPORT_PHONE, staff.phone, root.phone, kept.phone})
+
+    def test_the_simulation_lists_the_accounts_and_deletes_nothing(self):
+        output = self._run("--scope", "all", "--with-accounts")
+        self.assertIn("+22670010001", output)
+        self.assertIn("+22677470000", output)
+        self.assertIn("Simulation", output)
+        self.assertEqual(User.objects.count(), 2)
+
+    def test_the_support_account_is_protected_even_when_named(self):
+        from apps.messaging.services import SUPPORT_PHONE, support_account
+
+        support_account()
+        output = self._run("--phone", SUPPORT_PHONE, "--yes")
+        self.assertTrue(User.objects.filter(phone=SUPPORT_PHONE).exists())
+        self.assertIn("Comptes d'équipe conservés", output)
+
+    def test_the_demo_scope_takes_the_demo_searches_but_not_the_others(self):
+        from apps.analytics.models import SearchEvent
+
+        SearchEvent.objects.create(query="démo", normalized_query="démo", user=self.demo)
+        self._content()
+        self._run("--yes")
+        self.assertEqual(
+            sorted(SearchEvent.objects.values_list("normalized_query", flat=True)),
+            ["moto", "tente"],
+        )

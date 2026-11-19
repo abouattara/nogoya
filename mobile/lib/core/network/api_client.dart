@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 
 import 'wrapped_multipart.dart';
 
@@ -59,6 +60,9 @@ class ApiClient {
       options.headers['Authorization'] = 'Bearer $access';
     }
     options.headers['X-Visitor-Id'] = _tokens.visitorId();
+    // Pour l'analyse des recherches : d'ou elles viennent.
+    options.headers['X-Client'] =
+        defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
     handler.next(options);
   }
 

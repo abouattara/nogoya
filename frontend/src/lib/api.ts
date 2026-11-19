@@ -22,8 +22,9 @@ export async function getProducts(query: ProductFiltersQuery) {
       // Dynamic per-category filters (attr_<slug>, attr_<slug>_min/_max).
       ...(query.attributes ?? {}),
     },
-    // The list endpoint logs the search: it must be attributed to this visitor.
-    { headers: await visitorHeaders() }
+    // The list endpoint logs the search: it must be attributed to this visitor,
+    // and to the web channel (the mobile app announces itself the same way).
+    { headers: { ...(await visitorHeaders()), "X-Client": "web" } }
   );
 }
 

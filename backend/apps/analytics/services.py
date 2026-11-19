@@ -4,9 +4,11 @@ Business logic lives here (not in views/serializers) so both the REST API
 and any future internal callers (Celery tasks, admin actions) share it.
 """
 import re
+from datetime import timedelta
 
 from django.core.cache import cache
 from django.db.models import F
+from django.utils import timezone
 
 from .models import ContactEvent, ProductView, SearchEvent
 
@@ -50,15 +52,79 @@ def normalize_query(query):
     return _WHITESPACE_RE.sub(" ", query or "").strip().lower()
 
 
-def record_search_event(request, *, query, filters, results_count):
+#: Les canaux qu'un client peut annoncer. Tout le reste est ignore.
+SEARCH_CHANNELS = {"web", "android", "ios"}
+
+#: Une recherche tapee au fil des lettres reste une seule recherche si elle
+#: se precise dans ce delai.
+REFINE_WINDOW = timedelta(seconds=60)
+
+
+def record_search_event(request, *, query, filters, results_count, page=1):
+    """Enregistre une recherche, une seule fois par intention.
+
+    Deux choses gonflaient les chiffres sans rien dire de plus :
+
+    * **la pagination.** Faire defiler une liste charge les pages 2, 3,
+      4... de la meme recherche ; chacune comptait comme une recherche
+      nouvelle. Seule la premiere page est enregistree.
+    * **la frappe.** L'application cherche pendant qu'on tape : « ten »
+      puis « tente » faisaient deux recherches, dont une que personne
+      n'avait voulue. Une recherche qui en precise une autre du meme
+      visiteur, avec les memes filtres et dans la minute, remplace la
+      precedente au lieu de s'y ajouter.
+    """
+    try:
+        if int(page or 1) > 1:
+            return None
+    except (TypeError, ValueError):
+        return None
+
     normalized = normalize_query(query)
+    filters = filters or {}
     if not normalized and not filters:
-        return None  # nothing meaningful to log (empty homepage load, etc.)
+        return None  # rien a retenir : la page d'accueil, une liste vide de criteres
+
+    authenticated = request.user.is_authenticated
+    user = request.user if authenticated else None
+    visitor_id = "" if authenticated else getattr(request, "visitor_id", "")
+    channel = (request.headers.get("X-Client") or "").strip().lower()
+    if channel not in SEARCH_CHANNELS:
+        channel = ""
+
+    actor = {"user": user} if authenticated else {"user__isnull": True, "visitor_id": visitor_id}
+    if authenticated or visitor_id:
+        previous = (
+            SearchEvent.objects.filter(
+                created_at__gte=timezone.now() - REFINE_WINDOW, **actor
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        # Meme intention : l'une prolonge l'autre, dans un sens ou dans
+        # l'autre (on tape, on efface une lettre). Mais un champ vide ne
+        # remplace jamais une recherche ecrite : « tente » puis rien, c'est
+        # deux choses, et la premiere doit rester.
+        same_intent = previous is not None and previous.filters == filters and (
+            normalized.startswith(previous.normalized_query)
+            or (normalized and previous.normalized_query.startswith(normalized))
+        )
+        if same_intent:
+            previous.query = query or ""
+            previous.normalized_query = normalized
+            previous.results_count = results_count
+            previous.channel = previous.channel or channel
+            previous.save(
+                update_fields=["query", "normalized_query", "results_count", "channel"]
+            )
+            return previous
+
     return SearchEvent.objects.create(
-        user=request.user if request.user.is_authenticated else None,
-        visitor_id="" if request.user.is_authenticated else getattr(request, "visitor_id", ""),
+        user=user,
+        visitor_id=visitor_id,
         query=query or "",
         normalized_query=normalized,
-        filters=filters or {},
+        filters=filters,
         results_count=results_count,
+        channel=channel,
     )

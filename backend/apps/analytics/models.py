@@ -38,10 +38,19 @@ class SearchEvent(models.Model):
     normalized_query = models.CharField(max_length=255, blank=True, db_index=True)
     filters = models.JSONField(default=dict, blank=True)
     results_count = models.PositiveIntegerField(default=0)
+    # « web », « android », « ios », ou vide pour un appel direct a l'API.
+    # Annonce par le client (en-tete X-Client) : c'est une indication pour
+    # l'analyse, pas une donnee de confiance.
+    channel = models.CharField("canal", max_length=16, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "recherche"
+        verbose_name_plural = "recherches"
+
+    def __str__(self):
+        return self.query or str(self.filters)
 
 
 class ContactEvent(models.Model):
